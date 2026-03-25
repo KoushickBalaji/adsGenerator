@@ -72,8 +72,8 @@ async function getHeaders(): Promise<Record<string, string>> {
 }
 
 export type ImageListItem = {
-  url: string; // publicly accessible image URL
-  type: "first_frame" | "end_frame";
+  image: string; // publicly accessible image URL
+  image_type: "first_frame" | "end_frame";
 };
 
 export type MultiPromptItem = {
@@ -84,14 +84,17 @@ export type MultiPromptItem = {
 
 export type CreateVideoRequest = {
   model_name?: string;
+  image: string; // primary image URL (required for image-to-video)
+  image_tail?: string; // optional end frame image URL
   prompt?: string;
   negative_prompt?: string;
-  image_list?: ImageListItem[];
+  image_list?: ImageListItem[]; // alternative format (if supported)
   multi_shot?: boolean;
   multi_prompt?: MultiPromptItem[];
-  duration?: number; // 3-15 seconds
+  duration?: string; // "5" or "10" (string, not number)
   aspect_ratio?: string; // "16:9" | "9:16" | "1:1"
   cfg_scale?: number; // 0-1
+  mode?: string; // "std" or "pro"
   callback_url?: string;
 };
 

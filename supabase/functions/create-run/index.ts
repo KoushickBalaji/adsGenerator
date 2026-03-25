@@ -61,14 +61,10 @@ serve(async (req) => {
       : undefined;
 
     const klingRes = await createImageToVideo({
+      image: product.input_images[0],
+      image_tail: product.input_images[1] || undefined,
       prompt,
-      image_list: [
-        { url: product.input_images[0], type: "first_frame" },
-        ...(product.input_images[1]
-          ? [{ url: product.input_images[1], type: "end_frame" as const }]
-          : []),
-      ],
-      duration: 5,
+      duration: "5",
       aspect_ratio: "16:9",
       cfg_scale: 0.5,
       callback_url: webhookUrl,
@@ -112,7 +108,7 @@ Output only the prompt text, nothing else.`;
   const userMessage = `Product: ${product.product_title}\nCategory: ${product.product_category}\nDescription: ${product.product_description}`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

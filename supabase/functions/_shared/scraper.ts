@@ -95,11 +95,20 @@ async function fetchFromBluestoneApi(
     if (!res.ok) return null;
 
     const data = await res.json();
-    const details = data?.designEddDetails;
-    if (!details || !Array.isArray(details) || details.length === 0) return null;
+    const detailsObj = data?.designEddDetails;
+    if (!detailsObj || typeof detailsObj !== "object") return null;
+
+    // designEddDetails is an object keyed by variant code (e.g. "WHITE18VSGH")
+    const variants = Object.values(detailsObj) as Array<{
+      name?: string;
+      category?: string;
+      imageUrl?: string;
+      metalColor?: string;
+    }>;
+    if (variants.length === 0) return null;
 
     // Pick the first variant (default customization)
-    const variant = details[0];
+    const variant = variants[0];
     const name = variant.name || "";
     const category = (variant.category || extractCategoryFromUrl(originalUrl)).toLowerCase();
     const imageUrl = variant.imageUrl || "";
@@ -108,9 +117,9 @@ async function fetchFromBluestoneApi(
 
     const images = [toHighResImage(imageUrl)];
 
-    // If there are multiple variants, grab a second image for variety (optional end frame)
-    if (details.length > 1 && details[1].imageUrl) {
-      images.push(toHighResImage(details[1].imageUrl));
+    // If there are multiple variants with different images, grab a second for end frame
+    if (variants.length > 1 && variants[1].imageUrl && variants[1].imageUrl !== imageUrl) {
+      images.push(toHighResImage(variants[1].imageUrl));
     }
 
     return {
