@@ -51,6 +51,53 @@ export default function Home() {
     };
   }, [activeRun?.id, activeRun?.status]);
 
+  // Auto-poll every 15s when a run is processing (webhook fallback)
+  useEffect(() => {
+    if (!activeRun || (activeRun.status !== "processing" && activeRun.status !== "queued")) {
+      return;
+    }
+
+    const poll = async () => {
+      try {
+        await supabase.functions.invoke("refresh-run", {
+          body: { runId: activeRun.id },
+        });
+
+        const { data } = await supabase
+          .from("video_runs")
+          .select("*")
+          .eq("id", activeRun.id)
+          .single();
+
+        if (data) {
+          const updated = data as VideoRun;
+          setActiveRun(updated);
+          setRuns((prev) =>
+            prev.map((r) => (r.id === updated.id ? updated : r))
+          );
+          if (updated.status === "completed" || updated.status === "failed") {
+            setGenerating(false);
+          }
+        }
+      } catch {
+        // Silent — will retry on next interval
+      }
+    };
+
+    // Start polling after 30s (give webhook a chance first), then every 15s
+    const initialDelay = setTimeout(() => {
+      poll();
+      intervalRef = setInterval(poll, 15000);
+    }, 30000);
+
+    let intervalRef: ReturnType<typeof setInterval>;
+
+    return () => {
+      clearTimeout(initialDelay);
+      if (intervalRef) clearInterval(intervalRef);
+    };
+  }, [activeRun?.id, activeRun?.status]);
+
   async function loadHistory() {
     const { data } = await supabase
       .from("video_runs")
