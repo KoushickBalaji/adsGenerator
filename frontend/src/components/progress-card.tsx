@@ -1,17 +1,11 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { VideoRun } from "@/lib/supabase";
 
 type Props = {
   run: VideoRun;
   onRefresh: () => void;
-};
-
-const STATUS_LABELS: Record<VideoRun["status"], string> = {
-  queued: "Queued",
-  processing: "Processing",
-  completed: "Completed",
-  failed: "Failed",
 };
 
 const STATUS_COLORS: Record<VideoRun["status"], string> = {
@@ -20,6 +14,207 @@ const STATUS_COLORS: Record<VideoRun["status"], string> = {
   completed: "text-green-400",
   failed: "text-red-400",
 };
+
+// Pipeline steps shown during processing
+const PIPELINE_STEPS = [
+  { label: "Extracting product details", icon: "search", duration: 4000 },
+  { label: "Analysing jewellery design", icon: "gem", duration: 5000 },
+  { label: "Selecting brand ambassador", icon: "user", duration: 4000 },
+  { label: "Crafting video prompt", icon: "sparkle", duration: 5000 },
+  { label: "Composing scene layout", icon: "layout", duration: 6000 },
+  { label: "Generating video frames", icon: "film", duration: 15000 },
+  { label: "Rendering cinematic motion", icon: "clapperboard", duration: 20000 },
+  { label: "Applying studio lighting", icon: "sun", duration: 10000 },
+  { label: "Polishing final output", icon: "sparkles", duration: 10000 },
+];
+
+function StepIcon({ icon, className }: { icon: string; className?: string }) {
+  const cls = className || "w-4 h-4";
+  switch (icon) {
+    case "search":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      );
+    case "gem":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 9l10 13L22 9 12 2z" />
+        </svg>
+      );
+    case "user":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      );
+    case "sparkle":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+        </svg>
+      );
+    case "layout":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h16M9 4v16" />
+        </svg>
+      );
+    case "film":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+        </svg>
+      );
+    case "clapperboard":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      );
+    case "sun":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      );
+    case "sparkles":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function ProcessingPipeline({ startedAt }: { startedAt: string }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const start = new Date(startedAt).getTime();
+    const interval = setInterval(() => {
+      setElapsed(Date.now() - start);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [startedAt]);
+
+  useEffect(() => {
+    // Advance steps based on cumulative duration
+    let cumulative = 0;
+    for (let i = 0; i < PIPELINE_STEPS.length; i++) {
+      cumulative += PIPELINE_STEPS[i].duration;
+      if (elapsed < cumulative) {
+        setActiveStep(i);
+        return;
+      }
+    }
+    // If past all steps, stay on last one
+    setActiveStep(PIPELINE_STEPS.length - 1);
+  }, [elapsed]);
+
+  // Calculate total progress
+  const totalDuration = PIPELINE_STEPS.reduce((sum, s) => sum + s.duration, 0);
+  const progress = Math.min((elapsed / totalDuration) * 100, 95); // Cap at 95% until completed
+
+  return (
+    <div className="space-y-4">
+      {/* Progress bar */}
+      <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-blue-600 via-blue-400 to-cyan-400 transition-all duration-500 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      {/* Steps timeline */}
+      <div className="space-y-1">
+        {PIPELINE_STEPS.map((step, i) => {
+          const isActive = i === activeStep;
+          const isCompleted = i < activeStep;
+          const isFuture = i > activeStep;
+
+          return (
+            <div
+              key={step.label}
+              className={`flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all duration-500 ${
+                isActive
+                  ? "bg-blue-500/10 border border-blue-500/20"
+                  : isCompleted
+                  ? "opacity-60"
+                  : "opacity-0 h-0 py-0 overflow-hidden"
+              }`}
+              style={{
+                // Show next 2 upcoming steps faded
+                ...(isFuture && i <= activeStep + 2
+                  ? { opacity: 0.3, height: "auto", padding: "6px 12px", overflow: "visible" }
+                  : {}),
+              }}
+            >
+              {/* Step icon */}
+              <div
+                className={`flex-shrink-0 ${
+                  isActive
+                    ? "text-blue-400 animate-pulse"
+                    : isCompleted
+                    ? "text-green-400"
+                    : "text-zinc-600"
+                }`}
+              >
+                {isCompleted ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <StepIcon icon={step.icon} className="w-4 h-4" />
+                )}
+              </div>
+
+              {/* Step label */}
+              <span
+                className={`text-sm ${
+                  isActive
+                    ? "text-blue-300 font-medium"
+                    : isCompleted
+                    ? "text-zinc-400 line-through"
+                    : "text-zinc-600"
+                }`}
+              >
+                {step.label}
+                {isActive && (
+                  <span className="inline-flex ml-1.5">
+                    <span className="animate-bounce inline-block" style={{ animationDelay: "0ms" }}>.</span>
+                    <span className="animate-bounce inline-block" style={{ animationDelay: "150ms" }}>.</span>
+                    <span className="animate-bounce inline-block" style={{ animationDelay: "300ms" }}>.</span>
+                  </span>
+                )}
+              </span>
+
+              {/* Active spinner */}
+              {isActive && (
+                <div className="ml-auto flex-shrink-0">
+                  <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Elapsed time */}
+      <div className="flex items-center justify-between text-xs text-zinc-500">
+        <span>
+          {Math.floor(elapsed / 60000)}:{String(Math.floor((elapsed % 60000) / 1000)).padStart(2, "0")} elapsed
+        </span>
+        <span>Usually takes 1-2 minutes</span>
+      </div>
+    </div>
+  );
+}
 
 export function ProgressCard({ run, onRefresh }: Props) {
   const isActive = run.status === "queued" || run.status === "processing";
@@ -37,40 +232,41 @@ export function ProgressCard({ run, onRefresh }: Props) {
             </span>
           )}
         </div>
-        <span className={`text-sm font-medium ${STATUS_COLORS[run.status]}`}>
-          {STATUS_LABELS[run.status]}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className={`text-sm font-medium ${STATUS_COLORS[run.status]}`}>
+            {run.status === "queued"
+              ? "Queued"
+              : run.status === "processing"
+              ? "Generating"
+              : run.status === "completed"
+              ? "Completed"
+              : "Failed"}
+          </span>
+          {run.status === "processing" && (
+            <button
+              onClick={onRefresh}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors border border-zinc-700 rounded px-2 py-1 hover:bg-zinc-800"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
       </div>
 
-      {isActive && (
-        <div className="mb-4">
-          <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ${
-                run.status === "queued"
-                  ? "w-1/4 bg-yellow-500"
-                  : "w-3/4 bg-blue-500 animate-pulse"
-              }`}
-            />
-          </div>
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-sm text-zinc-400">
-              {run.status === "queued"
-                ? "Waiting for video generation to start..."
-                : "Video is being generated..."}
-            </p>
-            {run.status === "processing" && (
-              <button
-                onClick={onRefresh}
-                className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
-              >
-                Refresh status
-              </button>
-            )}
-          </div>
+      {/* Queued state */}
+      {run.status === "queued" && (
+        <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
+          <div className="w-4 h-4 border-2 border-yellow-400/30 border-t-yellow-400 rounded-full animate-spin" />
+          <span className="text-sm text-yellow-300/80">Waiting in queue...</span>
         </div>
       )}
 
+      {/* Processing state — animated pipeline */}
+      {run.status === "processing" && (
+        <ProcessingPipeline startedAt={run.created_at} />
+      )}
+
+      {/* Completed state */}
       {run.status === "completed" && run.output_video_url && (
         <div className="space-y-3">
           <video
@@ -84,15 +280,24 @@ export function ProgressCard({ run, onRefresh }: Props) {
             download
             className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
             Download MP4
           </a>
         </div>
       )}
 
+      {/* Failed state */}
       {run.status === "failed" && (
-        <p className="text-sm text-red-400">
-          {run.error_message || "Generation failed. Please try again."}
-        </p>
+        <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-red-500/5 border border-red-500/10">
+          <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span className="text-sm text-red-300">
+            {run.error_message || "Generation failed. Please try again."}
+          </span>
+        </div>
       )}
     </div>
   );
