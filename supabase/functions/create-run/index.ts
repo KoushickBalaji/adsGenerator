@@ -1,11 +1,16 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { getServiceClient } from "../_shared/supabase.ts";
 import { scrapeProduct } from "../_shared/scraper.ts";
-import { createImageToVideo } from "../_shared/kling.ts";
+import {
+  createMultiElementsVideo,
+  createImageToVideo,
+  getRandomElement,
+} from "../_shared/kling.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -29,16 +34,26 @@ serve(async (req) => {
     }
 
     if (!parsed.hostname.includes("bluestone.com")) {
-      return jsonResponse({ error: "Only BlueStone URLs are supported" }, 400);
+      return jsonResponse(
+        { error: "Only BlueStone URLs are supported" },
+        400
+      );
     }
 
     // 1. Scrape product data
     const product = await scrapeProduct(url);
 
-    // 2. Generate prompt via Claude API
-    const prompt = await generatePrompt(product);
+    // 2. Fetch a random element (brand ambassador) from Kling library
+    const element = await getRandomElement();
+    console.log(
+      "Selected element:",
+      element ? `${element.name} (${element.id})` : "none — falling back to image-to-video"
+    );
 
-    // 3. Insert DB row
+    // 3. Generate prompt (element-aware if we have one)
+    const prompt = await generatePrompt(product, !!element);
+
+    // 4. Insert DB row
     const supabase = getServiceClient();
     const { data: run, error: dbError } = await supabase
       .from("video_runs")
@@ -55,22 +70,39 @@ serve(async (req) => {
 
     if (dbError) throw dbError;
 
-    // 4. Call Kling API
+    // 5. Call Kling API — multi-elements if we have an element, else basic image-to-video
     const webhookUrl = Deno.env.get("SUPABASE_URL")
       ? `${Deno.env.get("SUPABASE_URL")}/functions/v1/kling-webhook`
       : undefined;
 
-    const klingRes = await createImageToVideo({
-      image: product.input_images[0],
-      image_tail: product.input_images[1] || undefined,
-      prompt,
-      duration: "5",
-      aspect_ratio: "16:9",
-      cfg_scale: 0.5,
-      callback_url: webhookUrl,
-    });
+    let klingRes;
 
-    // 5. Update row with provider job ID
+    if (element) {
+      // Multi-elements: product image + brand ambassador element
+      klingRes = await createMultiElementsVideo({
+        model_name: "kling-v3-0",
+        prompt,
+        image_0: product.input_images[0], // product as first frame reference
+        element_1: element.id, // brand ambassador
+        duration: "5",
+        aspect_ratio: "16:9",
+        mode: "std",
+        callback_url: webhookUrl,
+      });
+    } else {
+      // Fallback: basic image-to-video (no elements available)
+      klingRes = await createImageToVideo({
+        image: product.input_images[0],
+        image_tail: product.input_images[1] || undefined,
+        prompt,
+        duration: "5",
+        aspect_ratio: "16:9",
+        cfg_scale: 0.5,
+        callback_url: webhookUrl,
+      });
+    }
+
+    // 6. Update row with provider job ID
     await supabase
       .from("video_runs")
       .update({
@@ -89,19 +121,31 @@ serve(async (req) => {
   }
 });
 
-async function generatePrompt(product: {
-  product_title: string;
-  product_description: string;
-  product_category: string;
-}): Promise<string> {
+async function generatePrompt(
+  product: {
+    product_title: string;
+    product_description: string;
+    product_category: string;
+  },
+  hasElement: boolean
+): Promise<string> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
-  const systemPrompt = `You are a video ad prompt writer for a luxury jewellery brand. Given product details, write a single Kling image-to-video prompt (2-3 sentences). Always include:
+  // Adjust the system prompt based on whether we have a brand ambassador element
+  const elementInstructions = hasElement
+    ? `The video will feature a brand ambassador (referenced as @element_1) showcasing the jewellery.
+Include natural interactions between the person and the jewellery — the ambassador should be elegantly presenting, wearing, or admiring the piece.
+Reference the ambassador as @element_1 in the prompt.
+Reference the product image as @image_0 in the prompt.`
+    : `The video focuses purely on the jewellery piece itself — no people.`;
+
+  const systemPrompt = `You are a video ad prompt writer for a luxury jewellery brand. Given product details, write a single Kling video generation prompt (2-3 sentences). Always include:
 - Premium studio lighting with soft reflections
 - Slow cinematic camera motion (pan, orbit, or gentle zoom)
 - A clean, premium background (dark velvet, marble, or gradient)
 - Preserve the exact product design — no modifications
+${elementInstructions}
 Keep the prompt under 200 words. Do not include any text overlays or voiceover directions.
 Output only the prompt text, nothing else.`;
 
