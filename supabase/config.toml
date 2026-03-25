@@ -355,7 +355,7 @@ deno_version = 2
 [edge_runtime.secrets]
 KLING_ACCESS_KEY = "env(KLING_ACCESS_KEY)"
 KLING_SECRET_KEY = "env(KLING_SECRET_KEY)"
-ANTHROPIC_API_KEY = "env(ANTHROPIC_API_KEY)"
+GEMINI_API_KEY = "env(GEMINI_API_KEY)"
 WEBHOOK_SECRET = "env(WEBHOOK_SECRET)"
 
 [analytics]

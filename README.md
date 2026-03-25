@@ -250,7 +250,7 @@ Frontend (Vercel):
 Supabase Edge Functions:
 - `KLING_ACCESS_KEY` (from Kling developer portal)
 - `KLING_SECRET_KEY` (from Kling developer portal — used with access key to generate JWT)
-- `ANTHROPIC_API_KEY` (for Claude prompt generation)
+- `GEMINI_API_KEY` (for Gemini prompt generation)
 - `WEBHOOK_SECRET` (optional but recommended)
 
 ## Success Criteria

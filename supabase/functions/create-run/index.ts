@@ -98,47 +98,52 @@ async function generatePrompt(product: {
   product_description: string;
   product_category: string;
 }): Promise<string> {
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 300,
-      system: `You are a video ad prompt writer for a luxury jewellery brand. Given product details, write a single Kling image-to-video prompt (2-3 sentences). Always include:
+  const systemPrompt = `You are a video ad prompt writer for a luxury jewellery brand. Given product details, write a single Kling image-to-video prompt (2-3 sentences). Always include:
 - Premium studio lighting with soft reflections
 - Slow cinematic camera motion (pan, orbit, or gentle zoom)
 - A clean, premium background (dark velvet, marble, or gradient)
 - Preserve the exact product design — no modifications
 Keep the prompt under 200 words. Do not include any text overlays or voiceover directions.
-Output only the prompt text, nothing else.`,
-      messages: [
-        {
-          role: "user",
-          content: `Product: ${product.product_title}\nCategory: ${product.product_category}\nDescription: ${product.product_description}`,
+Output only the prompt text, nothing else.`;
+
+  const userMessage = `Product: ${product.product_title}\nCategory: ${product.product_category}\nDescription: ${product.product_description}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: systemPrompt }],
         },
-      ],
-    }),
-  });
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: userMessage }],
+          },
+        ],
+        generationConfig: {
+          maxOutputTokens: 300,
+          temperature: 0.7,
+        },
+      }),
+    }
+  );
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Claude API error ${res.status}: ${text}`);
+    throw new Error(`Gemini API error ${res.status}: ${text}`);
   }
 
   const data = await res.json();
-  const textBlock = data.content?.find(
-    (b: { type: string }) => b.type === "text"
-  );
-  if (!textBlock?.text) throw new Error("No prompt generated");
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("No prompt generated");
 
-  return textBlock.text.trim();
+  return text.trim();
 }
 
 function jsonResponse(body: unknown, status = 200) {
