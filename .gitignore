@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Supabase
+supabase/.temp/
+supabase/.env
+
+# Vercel
+.vercel/
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
