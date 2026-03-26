@@ -136,7 +136,13 @@ export default function Home() {
         setRuns((prev) => [videoRun, ...prev]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "";
+      // Network-level failures get a friendly message; backend errors are already friendly
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("CORS")) {
+        setError("Unable to reach the server. Please check your connection and try again.");
+      } else {
+        setError(msg || "Something unexpected happened. Please try again.");
+      }
       setGenerating(false);
     }
   }
@@ -189,7 +195,22 @@ export default function Home() {
         <section className="mb-8">
           <UrlInput onSubmit={handleGenerate} disabled={generating} />
           {error && (
-            <p className="mt-3 text-sm text-red-400">{error}</p>
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+              <svg className="mt-0.5 w-5 h-5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+              <button
+                onClick={() => setError("")}
+                className="text-red-400/60 hover:text-red-300 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           )}
         </section>
 

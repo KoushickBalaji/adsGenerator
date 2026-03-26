@@ -104,8 +104,9 @@ serve(async (req) => {
     return jsonResponse({ runId: run.id });
   } catch (err) {
     console.error("create-run error:", err);
+    const raw = err instanceof Error ? err.message : String(err);
     return jsonResponse(
-      { error: err instanceof Error ? err.message : "Internal error" },
+      { error: toFriendlyError(raw) },
       500
     );
   }
@@ -199,6 +200,44 @@ Your output MUST include @element_1 (the ambassador) and @image_0 (the product).
   }
 
   return prompt;
+}
+
+/** Map raw technical errors to user-friendly messages */
+function toFriendlyError(raw: string): string {
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("gemini_api_key") || lower.includes("gemini api"))
+    return "Our AI service is temporarily unavailable. Please try again in a moment.";
+
+  if (lower.includes("kling_access_key") || lower.includes("kling_secret_key"))
+    return "Video generation service is being configured. Please try again shortly.";
+
+  if (lower.includes("no brand ambassador") || lower.includes("no elements"))
+    return "Brand ambassador library is loading. Please try again in a few seconds.";
+
+  if (lower.includes("missing @element_1") || lower.includes("missing @image_0"))
+    return "We had trouble crafting the perfect prompt. Please try again — each attempt is unique.";
+
+  if (lower.includes("kling") && (lower.includes("401") || lower.includes("403")))
+    return "Video generation service credentials are being refreshed. Please try again shortly.";
+
+  if (lower.includes("kling") && lower.includes("429"))
+    return "We're generating too many videos right now. Please wait a moment and try again.";
+
+  if (lower.includes("kling"))
+    return "Video generation service encountered an issue. Please try again.";
+
+  if (lower.includes("scrape") || lower.includes("product"))
+    return "We couldn't read that product page. Please check the URL and try again.";
+
+  if (lower.includes("invalid url") || lower.includes("missing url"))
+    return "Please enter a valid BlueStone product URL.";
+
+  if (lower.includes("only bluestone"))
+    return "This tool works exclusively with BlueStone product URLs.";
+
+  // Catch-all — never expose raw internals
+  return "Something unexpected happened. Please try again.";
 }
 
 function jsonResponse(body: unknown, status = 200) {

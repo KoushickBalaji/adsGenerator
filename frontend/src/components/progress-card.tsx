@@ -290,13 +290,19 @@ export function ProgressCard({ run, onRefresh }: Props) {
 
       {/* Failed state */}
       {run.status === "failed" && (
-        <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-red-500/5 border border-red-500/10">
-          <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <span className="text-sm text-red-300">
-            {run.error_message || "Generation failed. Please try again."}
-          </span>
+        <div className="rounded-lg bg-red-500/5 border border-red-500/10 p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <svg className="mt-0.5 w-5 h-5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-red-300">Video generation didn&apos;t complete</p>
+              <p className="mt-1 text-xs text-red-300/70">
+                {run.error_message || "An unexpected issue occurred during generation. This can happen occasionally with AI-powered video creation."}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-zinc-500">Try generating again — each attempt produces a unique result.</p>
         </div>
       )}
     </div>
