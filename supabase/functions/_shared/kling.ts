@@ -177,8 +177,10 @@ export type CreateImageToVideoRequest = {
 export type CreateMultiElementsVideoRequest = {
   model_name?: string;
   prompt: string;
-  image_0?: string; // product image as first frame
-  image_1?: string;
+  image_0?: string; // product image angle 1
+  image_1?: string; // product image angle 2
+  image_2?: string; // product image angle 3
+  image_3?: string; // product image angle 4 (max 3 images + elements combined)
   element_1?: string; // element ID (brand ambassador)
   element_2?: string;
   element_3?: string;
@@ -228,6 +230,8 @@ export async function createMultiElementsVideo(
 
   if (req.image_0) body.image_0 = req.image_0;
   if (req.image_1) body.image_1 = req.image_1;
+  if (req.image_2) body.image_2 = req.image_2;
+  if (req.image_3) body.image_3 = req.image_3;
   if (req.element_1) body.element_1 = req.element_1;
   if (req.element_2) body.element_2 = req.element_2;
   if (req.element_3) body.element_3 = req.element_3;

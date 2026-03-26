@@ -1,6 +1,5 @@
 // BlueStone product data scraper
-// Uses BlueStone's internal delivery-date API for structured data,
-// falls back to HTML scraping with deno-dom.
+// Combines the internal API (for product metadata) with HTML scraping (for gallery images).
 
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.48/deno-dom-wasm.ts";
 
@@ -8,7 +7,7 @@ export type ProductData = {
   product_title: string;
   product_description: string;
   product_category: string;
-  input_images: string[];
+  input_images: string[]; // up to 4 high-res product images
 };
 
 const BROWSER_HEADERS: Record<string, string> = {
@@ -19,10 +18,11 @@ const BROWSER_HEADERS: Record<string, string> = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+const MAX_IMAGES = 4;
+
 /**
  * Extract the design ID from a BlueStone product URL.
  * Format: /category/product-name~DESIGN_ID.html
- * Example: /rings/the-gianna-ring~29595.html → 29595
  */
 function extractDesignId(url: string): string | null {
   const match = url.match(/~(\d+)\.html/);
@@ -31,56 +31,79 @@ function extractDesignId(url: string): string | null {
 
 /**
  * Extract category from the URL path.
- * Example: /rings/the-gianna-ring~29595.html → ring
  */
 function extractCategoryFromUrl(url: string): string {
   const path = new URL(url).pathname;
   const segment = path.split("/").filter(Boolean)[0] || "";
-  // BlueStone uses plural in URLs (rings, necklaces, earrings)
   const singular = segment.replace(/s$/, "").toLowerCase();
-  const known = ["ring", "necklace", "pendant", "earring", "bracelet", "bangle", "chain", "mangalsutra"];
+  const known = [
+    "ring", "necklace", "pendant", "earring", "bracelet",
+    "bangle", "chain", "mangalsutra",
+  ];
   return known.includes(singular) ? singular : singular || "jewellery";
 }
 
 /**
- * Get the highest-resolution image URL from BlueStone's CDN pattern.
- * Their CDN: https://kinclimg{N}.bluestone.com/f_{format},c_scale,w_{width},b_rgb:{bg}/{path}
- * We request w_1024 for high-res.
+ * Normalize a BlueStone CDN image URL to high-res (w_1024) jpg.
  */
-function toHighResImage(imageUrl: string): string {
-  // If already a full CDN URL, bump the width
-  if (imageUrl.includes("kinclimg")) {
-    return imageUrl.replace(/w_\d+/, "w_1024");
-  }
-  return imageUrl;
-}
-
-export async function scrapeProduct(url: string): Promise<ProductData> {
-  // Clean the URL
-  const cleanUrl = new URL(url);
-  cleanUrl.search = "";
-  const cleanUrlStr = cleanUrl.toString();
-
-  // Strategy 1: BlueStone internal API (fastest, most reliable)
-  const designId = extractDesignId(cleanUrlStr);
-  if (designId) {
-    const apiData = await fetchFromBluestoneApi(designId, cleanUrlStr);
-    if (apiData) return apiData;
-  }
-
-  // Strategy 2: HTML scraping fallback
-  return await scrapeFromHtml(cleanUrlStr);
+function toHighRes(url: string): string {
+  return url
+    .replace(/w_\d+/, "w_1024")
+    .replace(/f_webp/, "f_jpg");
 }
 
 /**
- * Strategy 1: Use BlueStone's delivery date API to get product data.
- * GET /deliverydate/design/get?pincode=560001&designId={id}&ajax=true
- * Returns variant details including name, category, imageUrl.
+ * Extract the unique image path from a CDN URL (ignoring CDN shard number and size).
+ * e.g. "kinclimg9.bluestone.com/f_jpg,c_scale,w_1024,.../giproduct/BS-R28_...-PICS-00001-1024-14128.png"
+ *   → "giproduct/BS-R28_...-PICS-00001-1024-14128.png"
  */
-async function fetchFromBluestoneApi(
+function imagePathKey(url: string): string {
+  const match = url.match(/giproduct\/(.+)$/);
+  return match ? match[1] : url;
+}
+
+export async function scrapeProduct(url: string): Promise<ProductData> {
+  const cleanUrl = new URL(url);
+  cleanUrl.search = "";
+  const cleanUrlStr = cleanUrl.toString();
+  const designId = extractDesignId(cleanUrlStr);
+
+  // Run both strategies in parallel:
+  // 1. API for metadata (title, category)
+  // 2. HTML for gallery images (multiple angles)
+  const [apiData, htmlImages] = await Promise.all([
+    designId ? fetchMetadataFromApi(designId, cleanUrlStr) : Promise.resolve(null),
+    fetchGalleryImagesFromHtml(cleanUrlStr),
+  ]);
+
+  // Prefer API metadata, fall back to HTML scraping for everything
+  if (apiData) {
+    // Use gallery images if we got them, else fall back to the API thumbnail
+    const images = htmlImages.length > 0 ? htmlImages : apiData.fallbackImages;
+    return {
+      product_title: apiData.name,
+      product_description: `${apiData.name} - Premium ${apiData.category} from BlueStone`,
+      product_category: apiData.category,
+      input_images: images.slice(0, MAX_IMAGES),
+    };
+  }
+
+  // Full HTML fallback
+  return scrapeFromHtml(cleanUrlStr, htmlImages);
+}
+
+// ─── Strategy 1: API for metadata ───
+
+type ApiMetadata = {
+  name: string;
+  category: string;
+  fallbackImages: string[]; // single thumbnail from API
+};
+
+async function fetchMetadataFromApi(
   designId: string,
   originalUrl: string
-): Promise<ProductData | null> {
+): Promise<ApiMetadata | null> {
   try {
     const apiUrl = `https://www.bluestone.com/deliverydate/design/get?pincode=560001&designId=${designId}&ajax=true`;
     const res = await fetch(apiUrl, {
@@ -98,46 +121,93 @@ async function fetchFromBluestoneApi(
     const detailsObj = data?.designEddDetails;
     if (!detailsObj || typeof detailsObj !== "object") return null;
 
-    // designEddDetails is an object keyed by variant code (e.g. "WHITE18VSGH")
     const variants = Object.values(detailsObj) as Array<{
       name?: string;
       category?: string;
       imageUrl?: string;
-      metalColor?: string;
     }>;
     if (variants.length === 0) return null;
 
-    // Pick the first variant (default customization)
     const variant = variants[0];
     const name = variant.name || "";
     const category = (variant.category || extractCategoryFromUrl(originalUrl)).toLowerCase();
-    const imageUrl = variant.imageUrl || "";
 
-    if (!name || !imageUrl) return null;
+    if (!name) return null;
 
-    const images = [toHighResImage(imageUrl)];
-
-    // If there are multiple variants with different images, grab a second for end frame
-    if (variants.length > 1 && variants[1].imageUrl && variants[1].imageUrl !== imageUrl) {
-      images.push(toHighResImage(variants[1].imageUrl));
+    // Collect unique images from different variants as fallback
+    const seen = new Set<string>();
+    const fallbackImages: string[] = [];
+    for (const v of variants) {
+      if (v.imageUrl) {
+        const key = imagePathKey(v.imageUrl);
+        if (!seen.has(key)) {
+          seen.add(key);
+          fallbackImages.push(toHighRes(v.imageUrl));
+        }
+      }
+      if (fallbackImages.length >= MAX_IMAGES) break;
     }
 
-    return {
-      product_title: name,
-      product_description: `${name} - Premium ${category} from BlueStone`,
-      product_category: category,
-      input_images: images,
-    };
+    return { name, category, fallbackImages };
   } catch {
     return null;
   }
 }
 
-/**
- * Strategy 2: Fetch the full HTML page and scrape OG tags / meta.
- * BlueStone SSR pages do include meta tags in some cases.
- */
-async function scrapeFromHtml(url: string): Promise<ProductData> {
+// ─── Strategy 2: HTML gallery images ───
+
+async function fetchGalleryImagesFromHtml(url: string): Promise<string[]> {
+  try {
+    const res = await fetch(url, {
+      headers: BROWSER_HEADERS,
+      redirect: "follow",
+    });
+
+    if (!res.ok) return [];
+
+    const html = await res.text();
+
+    // Extract the product code from the URL to filter product-specific images
+    // e.g. "BS-R28" from the image paths
+    const productCodeMatch = html.match(/giproduct\/([\w-]+?)_/);
+    const productCode = productCodeMatch ? productCodeMatch[1] : null;
+
+    if (!productCode) return [];
+
+    // Find all high-res (w_1024) product images matching this product code
+    const imageRegex = new RegExp(
+      `https://kinclimg\\d+\\.bluestone\\.com/[^"']+${productCode}[^"']+\\.(png|jpg|jpeg)`,
+      "g"
+    );
+    const allMatches = html.match(imageRegex) || [];
+
+    // Deduplicate by image path, keep only w_1024 versions, exclude posters/videos
+    const seen = new Set<string>();
+    const images: string[] = [];
+
+    for (const imgUrl of allMatches) {
+      // Only high-res versions
+      if (!imgUrl.includes("w_1024")) continue;
+      // Skip video posters
+      if (imgUrl.includes("POSTER")) continue;
+
+      const key = imagePathKey(imgUrl);
+      if (!seen.has(key)) {
+        seen.add(key);
+        images.push(toHighRes(imgUrl));
+      }
+      if (images.length >= MAX_IMAGES) break;
+    }
+
+    return images;
+  } catch {
+    return [];
+  }
+}
+
+// ─── Full HTML fallback (no API data) ───
+
+async function scrapeFromHtml(url: string, preloadedImages: string[]): Promise<ProductData> {
   const res = await fetch(url, {
     headers: BROWSER_HEADERS,
     redirect: "follow",
@@ -152,109 +222,56 @@ async function scrapeFromHtml(url: string): Promise<ProductData> {
   if (!doc) throw new Error("Failed to parse HTML");
 
   // Try JSON-LD
-  const jsonLd = extractJsonLd(doc);
-  if (jsonLd) return jsonLd;
-
-  // Try OG tags
-  const og = extractOpenGraph(doc);
-  if (og) return og;
-
-  // Try HTML selectors (title tag, img tags)
-  const htmlData = extractFromHtml(doc, url);
-  if (htmlData) return htmlData;
-
-  throw new Error("Could not extract product details from this URL");
-}
-
-function extractJsonLd(
-  doc: ReturnType<DOMParser["parseFromString"]>
-): ProductData | null {
-  if (!doc) return null;
-
   const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
   for (const script of scripts) {
     try {
       const data = JSON.parse(script.textContent || "");
-      const product = data["@type"] === "Product" ? data : null;
-      if (!product) continue;
+      if (data["@type"] === "Product" && data.name) {
+        const ldImages: string[] = [];
+        if (typeof data.image === "string") ldImages.push(data.image);
+        else if (Array.isArray(data.image)) ldImages.push(...data.image);
 
-      const images: string[] = [];
-      if (typeof product.image === "string") {
-        images.push(product.image);
-      } else if (Array.isArray(product.image)) {
-        images.push(...product.image.slice(0, 2));
+        const images = preloadedImages.length > 0 ? preloadedImages : ldImages;
+        return {
+          product_title: data.name,
+          product_description: data.description || "",
+          product_category: inferCategory(data.name, data.category || ""),
+          input_images: images.slice(0, MAX_IMAGES),
+        };
       }
-
-      if (images.length === 0) continue;
-
-      return {
-        product_title: product.name || "",
-        product_description: product.description || "",
-        product_category: inferCategory(product.name || "", product.category || ""),
-        input_images: images,
-      };
-    } catch {
-      // Invalid JSON-LD, try next
-    }
+    } catch { /* skip */ }
   }
-  return null;
-}
 
-function extractOpenGraph(
-  doc: ReturnType<DOMParser["parseFromString"]>
-): ProductData | null {
-  if (!doc) return null;
+  // Try OG tags
+  const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute("content");
+  const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute("content");
+  const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute("content");
 
-  const title =
-    doc.querySelector('meta[property="og:title"]')?.getAttribute("content");
-  const image =
-    doc.querySelector('meta[property="og:image"]')?.getAttribute("content");
-  const desc =
-    doc.querySelector('meta[property="og:description"]')?.getAttribute("content");
+  if (ogTitle && ogImage) {
+    const images = preloadedImages.length > 0 ? preloadedImages : [ogImage];
+    return {
+      product_title: ogTitle,
+      product_description: ogDesc || "",
+      product_category: inferCategory(ogTitle, ""),
+      input_images: images.slice(0, MAX_IMAGES),
+    };
+  }
 
-  if (!title || !image) return null;
+  // Last resort
+  if (preloadedImages.length > 0) {
+    return {
+      product_title: "BlueStone Product",
+      product_description: "",
+      product_category: extractCategoryFromUrl(url),
+      input_images: preloadedImages.slice(0, MAX_IMAGES),
+    };
+  }
 
-  return {
-    product_title: title,
-    product_description: desc || "",
-    product_category: inferCategory(title, ""),
-    input_images: [image],
-  };
-}
-
-function extractFromHtml(
-  doc: ReturnType<DOMParser["parseFromString"]>,
-  url: string
-): ProductData | null {
-  if (!doc) return null;
-
-  // Try to find product title from common selectors
-  const titleEl =
-    doc.querySelector("h1.product-name") ||
-    doc.querySelector("h1") ||
-    doc.querySelector(".product-title");
-  const title = titleEl?.textContent?.trim();
-
-  // Try to find product images
-  const imgEl =
-    doc.querySelector(".product-image img") ||
-    doc.querySelector(".main-image img") ||
-    doc.querySelector("img[src*='kinclimg']");
-  const imgSrc = imgEl?.getAttribute("src") || imgEl?.getAttribute("data-src");
-
-  if (!title || !imgSrc) return null;
-
-  return {
-    product_title: title,
-    product_description: "",
-    product_category: extractCategoryFromUrl(url),
-    input_images: [toHighResImage(imgSrc)],
-  };
+  throw new Error("Could not extract product details from this URL");
 }
 
 function inferCategory(title: string, category: string): string {
   if (category) return category.toLowerCase();
-
   const lower = title.toLowerCase();
   const categories = [
     "ring", "necklace", "pendant", "earring", "bracelet",

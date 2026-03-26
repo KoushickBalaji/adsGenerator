@@ -51,7 +51,7 @@ serve(async (req) => {
     );
 
     // 3. Generate prompt (element-aware if we have one)
-    const prompt = await generatePrompt(product, !!element);
+    const prompt = await generatePrompt(product, !!element, product.input_images.length);
 
     // 4. Insert DB row
     const supabase = getServiceClient();
@@ -78,11 +78,15 @@ serve(async (req) => {
     let klingRes;
 
     if (element) {
-      // Multi-elements: product image + brand ambassador element
+      // Multi-elements: up to 3 product images + 1 brand ambassador element
+      // Kling allows max 3 images + elements combined
+      const imgs = product.input_images;
       klingRes = await createMultiElementsVideo({
         model_name: "kling-v3-0",
         prompt,
-        image_0: product.input_images[0], // product as first frame reference
+        image_0: imgs[0], // main product shot
+        image_1: imgs[1] || undefined, // second angle
+        image_2: imgs[2] || undefined, // third angle
         element_1: element.id, // brand ambassador
         duration: "5",
         aspect_ratio: "16:9",
@@ -127,29 +131,57 @@ async function generatePrompt(
     product_description: string;
     product_category: string;
   },
-  hasElement: boolean
+  hasElement: boolean,
+  imageCount: number
 ): Promise<string> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
-  // Adjust the system prompt based on whether we have a brand ambassador element
-  const elementInstructions = hasElement
-    ? `The video will feature a brand ambassador (referenced as @element_1) showcasing the jewellery.
-Include natural interactions between the person and the jewellery — the ambassador should be elegantly presenting, wearing, or admiring the piece.
-Reference the ambassador as @element_1 in the prompt.
-Reference the product image as @image_0 in the prompt.`
-    : `The video focuses purely on the jewellery piece itself — no people.`;
+  // Build image reference list
+  const imageRefs = Array.from({ length: Math.min(imageCount, 3) }, (_, i) => `@image_${i}`);
+  const imageRefStr = imageRefs.join(", ");
 
-  const systemPrompt = `You are a video ad prompt writer for a luxury jewellery brand. Given product details, write a single Kling video generation prompt (2-3 sentences). Always include:
-- Premium studio lighting with soft reflections
-- Slow cinematic camera motion (pan, orbit, or gentle zoom)
-- A clean, premium background (dark velvet, marble, or gradient)
-- Preserve the exact product design — no modifications
-${elementInstructions}
-Keep the prompt under 200 words. Do not include any text overlays or voiceover directions.
-Output only the prompt text, nothing else.`;
+  let systemPrompt: string;
 
-  const userMessage = `Product: ${product.product_title}\nCategory: ${product.product_category}\nDescription: ${product.product_description}`;
+  if (hasElement) {
+    systemPrompt = `You write Kling AI video prompts for luxury jewellery ads. You MUST use the special reference tokens exactly as shown.
+
+AVAILABLE REFERENCES:
+- @element_1 = the brand ambassador (a real person — use them as the main subject)
+- ${imageRefs.map((ref, i) => `${ref} = product photo angle ${i + 1}`).join("\n- ")}
+
+RULES:
+1. Your prompt MUST contain @element_1 at least once — this is the brand ambassador who wears/presents the jewellery.
+2. Your prompt MUST contain @image_0 at least once — this is the product being showcased.
+3. The ambassador (@element_1) should be WEARING or PRESENTING the ${product.product_category} shown in ${imageRefStr}.
+4. Include cinematic camera motion (slow orbit, gentle zoom, or tracking shot).
+5. Include premium lighting (studio lights, soft reflections, warm highlights on metal/gems).
+6. Use a luxury setting (dark studio, marble surface, elegant interior, or soft gradient backdrop).
+7. Do NOT mention text overlays, voiceover, music, or sound.
+8. Output ONLY the prompt — no explanations, no markdown, no quotes.
+9. Keep it 2-4 sentences, under 200 words.
+
+EXAMPLES:
+- "@element_1 elegantly presents @image_0, a stunning diamond ring, turning her hand slowly under warm studio lights. The camera orbits gently as light catches each facet, creating soft prismatic reflections against a dark velvet backdrop."
+- "Close-up of @element_1 wearing @image_0, a delicate gold necklace, as she turns gracefully in soft studio lighting. The camera pulls back slowly to reveal the full pendant design, with warm highlights dancing across the polished metal."`;
+  } else {
+    systemPrompt = `You write Kling AI video prompts for luxury jewellery product shots. No people — product only.
+
+RULES:
+1. Focus entirely on the jewellery piece itself.
+2. Include cinematic camera motion (slow orbit, gentle zoom, or tracking shot).
+3. Include premium lighting (studio lights, soft reflections, warm highlights on metal/gems).
+4. Use a luxury setting (dark velvet, marble, soft gradient).
+5. Do NOT mention text overlays, voiceover, music, or sound.
+6. Output ONLY the prompt — no explanations, no markdown, no quotes.
+7. Keep it 2-3 sentences, under 200 words.`;
+  }
+
+  const userMessage = `Write a Kling video prompt for this jewellery product:
+Product: ${product.product_title}
+Category: ${product.product_category}
+Description: ${product.product_description}
+${hasElement ? `\nRemember: You MUST include @element_1 (ambassador) and @image_0 (product) in your output.` : ""}`;
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -167,8 +199,9 @@ Output only the prompt text, nothing else.`;
           },
         ],
         generationConfig: {
-          maxOutputTokens: 300,
+          maxOutputTokens: 1024,
           temperature: 0.7,
+          thinkingConfig: { thinkingBudget: 0 }, // disable thinking to avoid eating output tokens
         },
       }),
     }
