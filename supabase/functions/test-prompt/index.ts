@@ -1,12 +1,31 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { scrapeProduct } from "../_shared/scraper.ts";
-import { getRandomElement } from "../_shared/kling.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+/**
+ * Fetch an image URL and return it as a base64-encoded data part for Gemini.
+ */
+async function imageUrlToGeminiPart(
+  url: string
+): Promise<{ inline_data: { mime_type: string; data: string } } | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") || "image/jpeg";
+    const buffer = await res.arrayBuffer();
+    const base64 = btoa(
+      String.fromCharCode(...new Uint8Array(buffer))
+    );
+    return { inline_data: { mime_type: contentType, data: base64 } };
+  } catch {
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,71 +35,88 @@ serve(async (req) => {
   try {
     const { url } = await req.json();
 
-    // Step 1: Scrape
+    // Step 1: Scrape product
     const product = await scrapeProduct(url);
-    console.log(`[step 1] Scraped: "${product.product_title}", ${product.input_images.length} images`);
+    const images = product.input_images.slice(0, 3);
 
-    // Step 2: Fetch element
-    const element = await getRandomElement();
-    console.log(`[step 2] Element:`, element ? `${element.name} (${element.id})` : "NONE");
+    // Step 2: Fetch images as base64 for Gemini vision
+    const imageParts = (
+      await Promise.all(images.map((imgUrl) => imageUrlToGeminiPart(imgUrl)))
+    ).filter(Boolean);
 
-    if (!element) {
-      return json({
-        error: "No elements found in Kling account",
-        step: 2,
-        product,
-      }, 500);
+    // Build image label parts so Gemini knows which token maps to which image
+    const imageLabels = images
+      .map((_, i) => `@image_${i}`)
+      .join(", ");
+
+    const systemPrompt = `You are a creative director writing Kling AI video prompts for luxury jewellery ad films.
+
+You will be shown reference images of a jewellery piece. Study them carefully — notice the type of jewellery, the metal color, the stones, and how it looks when worn.
+
+REFERENCE TOKENS (you MUST use these — they map to real assets in the video engine):
+- @element_1 = a brand ambassador (real person, will be composited into the video)
+- ${images.map((_, i) => `@image_${i} = reference image ${i + 1} of the jewellery piece (shown below)`).join("\n- ")}
+
+CRITICAL RULES:
+1. MUST include @element_1 at least once — she is the star of the ad.
+2. MUST include at least one @image_N token (${imageLabels}) to anchor the product in the scene.
+3. NEVER use the product's name, brand name, or any proper noun. Kling doesn't know product names — using them causes visual hallucinations (e.g. "Lotus Ring" generates an actual lotus). Refer to the piece only as "the ${product.product_category}" or via the @image token.
+4. Write a STORYLINE, not a product shot. Think 5-second ad film: the ambassador has a moment, an emotion, a real-life setting. The jewellery is part of her world, not the sole focus.
+5. @element_1 should be WEARING the ${product.product_category} naturally — part of her everyday look, not "presenting" or "revealing" it.
+6. ONE continuous camera move (tracking, dolly, slow push-in, handheld follow). No cuts.
+7. Set a REAL-LIFE scene. Pick from a wide range — everyday moments are powerful:
+   - Professional: giving a presentation, typing at a laptop, leading a meeting
+   - Active: morning jog, yoga, gym, playing a sport
+   - Social: laughing with friends at a café, school pickup, grocery shopping
+   - Intimate: reading on the couch, cooking dinner, morning coffee on a balcony
+   - Aspirational: rooftop at golden hour, gallery opening, boarding a flight
+   The jewellery should feel like something she never takes off — part of every moment.
+8. Include subtle motion: hair, fabric, ambient light, natural reflections.
+9. Do NOT mention text, voiceover, music, logos, titles, or sound.
+10. Output ONLY the raw prompt — no quotes, no markdown, no explanation.
+11. 3-5 sentences, 60-120 words.
+
+GOOD EXAMPLES:
+"@element_1 stands at the front of a bright conference room, gesturing confidently at a presentation screen. The camera slowly dollies in from the back of the room. Natural daylight from floor-to-ceiling windows catches @image_0 on her wrist as she moves her hand, casting a brief warm reflection on the glass table."
+
+"@element_1 jogs along a tree-lined path in early morning light, her breath visible in the cool air. The camera tracks alongside her in a smooth handheld follow. As she slows to a walk and pushes hair from her face, @image_1 catches a shaft of golden sunlight filtering through the leaves."
+
+"@element_1 sits cross-legged on a living room couch, a paperback open in her lap and a steaming mug beside her. Soft afternoon light drifts through sheer curtains. The camera slowly pushes in as she turns a page — @image_0 on her finger glints quietly in the warm light."
+
+BAD EXAMPLES (DO NOT write like these):
+- "A slow orbit around the Solaris Ring on dark velvet" ← product shot, no story, uses product name
+- "@element_1 presents @image_0 under studio lights" ← no narrative, catalog feel
+- "@element_1 at a glamorous gala wearing @image_0" ← lazy, always defaults to luxury events`;
+
+    // Build multimodal user message: text + images
+    const userParts: Array<Record<string, unknown>> = [];
+
+    // Add text instruction first
+    userParts.push({
+      text: `Here are the reference images of the ${product.product_category}. Study them, then write a Kling video ad prompt.\n\nRemember: @element_1 is the ambassador. ${imageLabels} are the product images shown below — use whichever feels natural. Tell a story.`,
+    });
+
+    // Add each image with a label
+    for (let i = 0; i < imageParts.length; i++) {
+      userParts.push({ text: `\n@image_${i}:` });
+      userParts.push(imageParts[i]!);
     }
-
-    // Step 3: Generate prompt
-    const imageCount = Math.min(product.input_images.length, 3);
-    const imageRefs = Array.from({ length: imageCount }, (_, i) => `@image_${i}`);
-    const imageRefStr = imageRefs.join(", ");
-
-    const systemPrompt = `You write Kling AI video prompts for luxury jewellery ads featuring a brand ambassador.
-
-You MUST use these special reference tokens in your output — they map to real images/people in the video:
-- @element_1 = the brand ambassador (a real person who will appear in the video)
-- ${imageRefs.map((ref, i) => `${ref} = product photo angle ${i + 1}`).join("\n- ")}
-
-RULES:
-1. Your prompt MUST contain @element_1 at least once — she is the main subject.
-2. Your prompt MUST contain @image_0 at least once — this is the jewellery product.
-3. @element_1 should be WEARING or PRESENTING the ${product.product_category} shown in ${imageRefStr}.
-4. Describe cinematic camera motion (slow orbit, gentle zoom, tracking shot).
-5. Describe premium lighting (studio lights, soft reflections, warm highlights on metal/gems).
-6. Use a luxury setting (dark studio, marble surface, elegant interior).
-7. Do NOT mention text overlays, voiceover, music, or sound effects.
-8. Output ONLY the raw prompt text — no markdown, no quotes, no explanations.
-9. 2-4 sentences, under 200 words.
-
-EXAMPLES:
-"@element_1 elegantly presents @image_0, a stunning diamond ring, turning her hand slowly under warm studio lights. The camera orbits gently as light catches each facet, creating soft prismatic reflections against a dark velvet backdrop."
-
-"Close-up of @element_1 wearing @image_0, a delicate gold necklace, as she turns gracefully in soft studio lighting. The camera pulls back slowly to reveal the full pendant design, with warm highlights dancing across the polished metal."`;
-
-    const userMessage = `Write a Kling video prompt for:
-Product: ${product.product_title}
-Category: ${product.product_category}
-Description: ${product.product_description}
-
-Your output MUST include @element_1 (the ambassador) and @image_0 (the product). No exceptions.`;
 
     const apiKey = Deno.env.get("GEMINI_API_KEY");
     if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userMessage }] }],
+          contents: [{ role: "user", parts: userParts }],
           generationConfig: {
             maxOutputTokens: 1024,
             temperature: 0.7,
-            thinkingConfig: { thinkingBudget: 0 },
+            thinkingConfig: { thinkingBudget: 4096 },
           },
         }),
       }
@@ -92,31 +128,27 @@ Your output MUST include @element_1 (the ambassador) and @image_0 (the product).
     }
 
     const geminiData = await geminiRes.json();
-    const generatedPrompt = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const generatedPrompt =
+      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    // Validate
-    const hasElement1 = generatedPrompt?.includes("@element_1");
-    const hasImage0 = generatedPrompt?.includes("@image_0");
+    // Validate: must have @element_1 and at least one @image_N
+    const hasElement1 = generatedPrompt?.includes("@element_1") ?? false;
+    const hasAnyImage =
+      /\@image_\d/.test(generatedPrompt || "");
 
-    // STOP HERE — no Kling call, no DB write
     return json({
       status: "dry_run_complete",
       product: {
         title: product.product_title,
         category: product.product_category,
+        image_count: product.input_images.length,
         images: product.input_images,
       },
-      element: {
-        name: element.name,
-        id: element.id,
-      },
       prompt: {
-        system_instruction: systemPrompt,
-        user_message: userMessage,
         generated: generatedPrompt,
         has_element_1: hasElement1,
-        has_image_0: hasImage0,
-        valid: hasElement1 && hasImage0,
+        has_image_ref: hasAnyImage,
+        valid: hasElement1 && hasAnyImage,
       },
     });
   } catch (err) {
