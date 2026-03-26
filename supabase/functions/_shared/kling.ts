@@ -123,11 +123,10 @@ export async function listElements(
 ): Promise<KlingElement[]> {
   const headers = await getHeaders();
 
-  // Try the official API endpoint
-  const res = await fetch(
-    `${KLING_BASE_URL}/v1/elements?pageNum=${pageNum}&pageSize=${pageSize}`,
-    { method: "GET", headers }
-  );
+  const url = `${KLING_BASE_URL}/v1/elements?pageNum=${pageNum}&pageSize=${pageSize}`;
+  console.log("[listElements] Fetching:", url);
+
+  const res = await fetch(url, { method: "GET", headers });
 
   if (!res.ok) {
     const text = await res.text();
@@ -135,6 +134,7 @@ export async function listElements(
   }
 
   const data = await res.json();
+  console.log("[listElements] Raw response:", JSON.stringify(data).slice(0, 500));
 
   // Handle different response shapes
   const elements =
@@ -143,20 +143,22 @@ export async function listElements(
     data?.data ||
     [];
 
-  return Array.isArray(elements) ? elements : [];
+  const result = Array.isArray(elements) ? elements : [];
+  console.log(`[listElements] Found ${result.length} elements`);
+  return result;
 }
 
-/** Pick a random element from the account */
+/** Pick a random element from the account — throws on failure instead of silently returning null */
 export async function getRandomElement(): Promise<KlingElement | null> {
-  try {
-    const elements = await listElements();
-    if (elements.length === 0) return null;
-    const idx = Math.floor(Math.random() * elements.length);
-    return elements[idx];
-  } catch (err) {
-    console.error("Failed to fetch elements:", err);
+  const elements = await listElements();
+  if (elements.length === 0) {
+    console.warn("[getRandomElement] No elements found in Kling account — will use product-only prompt");
     return null;
   }
+  const idx = Math.floor(Math.random() * elements.length);
+  const picked = elements[idx];
+  console.log(`[getRandomElement] Picked element: ${picked.name} (${picked.id})`);
+  return picked;
 }
 
 // ─── Video Generation ───
