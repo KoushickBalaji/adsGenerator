@@ -208,7 +208,7 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
         <span>
           {Math.floor(elapsed / 60000)}:{String(Math.floor((elapsed % 60000) / 1000)).padStart(2, "0")} elapsed
         </span>
-        <span>Usually takes 1-2 minutes</span>
+        <span>May take a few minutes - take a look around or try another item while you wait</span>
       </div>
     </div>
   );

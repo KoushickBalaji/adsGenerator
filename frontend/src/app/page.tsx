@@ -9,7 +9,7 @@ import { HistoryList } from "@/components/history-list";
 export default function Home() {
   const [runs, setRuns] = useState<VideoRun[]>([]);
   const [activeRun, setActiveRun] = useState<VideoRun | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
 
   // Load history on mount
@@ -39,9 +39,6 @@ export default function Home() {
           setRuns((prev) =>
             prev.map((r) => (r.id === updated.id ? updated : r))
           );
-          if (updated.status === "completed" || updated.status === "failed") {
-            setGenerating(false);
-          }
         }
       )
       .subscribe();
@@ -75,12 +72,9 @@ export default function Home() {
           setRuns((prev) =>
             prev.map((r) => (r.id === updated.id ? updated : r))
           );
-          if (updated.status === "completed" || updated.status === "failed") {
-            setGenerating(false);
-          }
         }
       } catch {
-        // Silent — will retry on next interval
+        // Silent - will retry on next interval
       }
     };
 
@@ -110,7 +104,7 @@ export default function Home() {
 
   async function handleGenerate(url: string) {
     setError("");
-    setGenerating(true);
+    setStarting(true);
 
     try {
       const res = await supabase.functions.invoke("create-run", {
@@ -156,8 +150,9 @@ export default function Home() {
       } else {
         setError(msg || "Something unexpected happened. Please try again.");
       }
-      setGenerating(false);
     }
+
+    setStarting(false);
   }
 
   const handleRefresh = useCallback(async () => {
@@ -227,7 +222,7 @@ export default function Home() {
       <main className="mx-auto max-w-5xl px-6 py-8">
         {/* Input */}
         <section className="mb-8">
-          <UrlInput onSubmit={handleGenerate} disabled={generating} />
+          <UrlInput onSubmit={handleGenerate} disabled={starting} />
           {error && (
             <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
               <svg className="mt-0.5 w-5 h-5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

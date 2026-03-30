@@ -46,6 +46,23 @@ serve(async (req) => {
       );
     }
 
+    // Step 0: Basic concurrency guard (keep UX simple; no explicit limit in the UI)
+    const MAX_CONCURRENT_RUNS = 3;
+    const supabase = getServiceClient();
+    const { count: activeCount, error: countError } = await supabase
+      .from("video_runs")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["queued", "processing"]);
+
+    if (countError) {
+      console.warn("[step 0] Could not check active runs count:", countError);
+    } else if ((activeCount ?? 0) >= MAX_CONCURRENT_RUNS) {
+      return jsonResponse(
+        { error: "We're a bit busy right now. Please try again in a few minutes." },
+        429
+      );
+    }
+
     // Step 1: Scrape product data
     const product = await scrapeProduct(url);
     console.log(`[step 1] Scraped: "${product.product_title}", ${product.input_images.length} images`);
@@ -75,7 +92,6 @@ serve(async (req) => {
     console.log(`[step 3] Prompt: ${prompt}`);
 
     // Step 4: Insert DB row
-    const supabase = getServiceClient();
     const { data: run, error: dbError } = await supabase
       .from("video_runs")
       .insert({
