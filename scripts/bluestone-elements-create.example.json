@@ -1,0 +1,48 @@
+{
+  "assets_base_url": "https://<your-vercel-deployment-or-domain>",
+  "dry_run": true,
+  "on_existing": "skip",
+  "elements": [
+    {
+      "name": "bluestone-muse-01",
+      "description": "BlueStone muse 01",
+      "frontal_path": "/kling-elements/bluestone-muse-01/front.jpg",
+      "ref_paths": [
+        "/kling-elements/bluestone-muse-01/ref1.jpg",
+        "/kling-elements/bluestone-muse-01/ref2.jpg",
+        "/kling-elements/bluestone-muse-01/ref3.jpg"
+      ]
+    },
+    {
+      "name": "bluestone-muse-02",
+      "description": "BlueStone muse 02",
+      "frontal_path": "/kling-elements/bluestone-muse-02/front.png",
+      "ref_paths": [
+        "/kling-elements/bluestone-muse-02/ref1.jpg",
+        "/kling-elements/bluestone-muse-02/ref2.jpg",
+        "/kling-elements/bluestone-muse-02/ref3.png"
+      ]
+    },
+    {
+      "name": "bluestone-muse-03",
+      "description": "BlueStone muse 03",
+      "frontal_path": "/kling-elements/bluestone-muse-03/front.jpg",
+      "ref_paths": [
+        "/kling-elements/bluestone-muse-03/ref1.jpg",
+        "/kling-elements/bluestone-muse-03/ref2.jpg",
+        "/kling-elements/bluestone-muse-03/ref3.jpg"
+      ]
+    },
+    {
+      "name": "bluestone-muse-04",
+      "description": "BlueStone muse 04",
+      "frontal_path": "/kling-elements/bluestone-muse-04/front.jpeg",
+      "ref_paths": [
+        "/kling-elements/bluestone-muse-04/ref1.jpg",
+        "/kling-elements/bluestone-muse-04/ref2.png",
+        "/kling-elements/bluestone-muse-04/ref3.jpg"
+      ]
+    }
+  ]
+}
+

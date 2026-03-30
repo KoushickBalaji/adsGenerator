@@ -78,7 +78,7 @@ Extract product data from BlueStone URLs using a prioritized fallback approach:
 
 1. **JSON-LD** (preferred): Parse `<script type="application/ld+json">` blocks for `@type: Product`. Extracts `name`, `image`, `description`, and `category` reliably.
 2. **Open Graph tags** (fallback): Extract `og:title`, `og:image`, `og:description` from `<meta>` tags.
-3. **HTML selectors** (last resort): Direct DOM scraping of product title headings, image galleries, etc. Most fragile — only use if structured data is absent.
+3. **HTML selectors** (last resort): Direct DOM scraping of product title headings, image galleries, etc. Most fragile - only use if structured data is absent.
 
 Image selection: prefer the largest/highest-resolution product image. Avoid thumbnails, lifestyle shots, and size-chart images. Look for CDN URL patterns indicating full-size variants.
 
@@ -86,17 +86,17 @@ Image selection: prefer the largest/highest-resolution product image. Avoid thum
 
 **Backend status flow (two layers):**
 
-1. **Kling → DB:** Kling webhook → `kling-webhook` Edge Function → updates `video_runs` row. Fallback: `refresh-run` Edge Function polls the **Kling API** (not Supabase) using `provider_job_id`, then updates DB.
-2. **DB → Frontend:** Supabase Realtime subscription on the `video_runs` row pushes status changes to the UI instantly. The frontend never talks to Kling directly.
+1. **Kling -> DB:** Kling webhook -> `kling-webhook` Edge Function -> updates `video_runs` row. Fallback: `refresh-run` Edge Function polls the **Kling API** (not Supabase) using `provider_job_id`, then updates DB.
+2. **DB -> Frontend:** Supabase Realtime subscription on the `video_runs` row pushes status changes to the UI instantly. The frontend never talks to Kling directly.
 
 ```
 Frontend (Vercel)
-  → Supabase Edge Function: `create-run`
-    → Claude API (generate prompt)
-    → Kling API (async image-to-video job)
-  → Kling webhook → `kling-webhook` Edge Function → updates DB
-  → (fallback) `refresh-run` Edge Function → polls Kling API → updates DB
-  → Supabase Realtime → Frontend gets instant status updates
+  -> Supabase Edge Function: `create-run`
+    -> Claude API (generate prompt)
+    -> Kling API (async image-to-video job)
+  -> Kling webhook -> `kling-webhook` Edge Function -> updates DB
+  -> (fallback) `refresh-run` Edge Function -> polls Kling API -> updates DB
+  -> Supabase Realtime -> Frontend gets instant status updates
 ```
 
 ## Data Model
@@ -167,28 +167,28 @@ Steps:
 
 ### 3) Optional: `refresh-run`
 
-Polling fallback if webhook is unreliable — polls the **Kling API** directly:
+Polling fallback if webhook is unreliable - polls the **Kling API** directly:
 - Given `runId`, query Kling API status using `provider_job_id`
 - Update DB row if status has changed
 - Can be triggered manually from the frontend or on a schedule
 
 ## Prompt Generation (via Claude API)
 
-Instead of a fixed template, use Claude API to generate a tailored prompt string for Kling. Kling takes a **single `prompt` field** (max 2,500 characters) — no system/user separation on the Kling side.
+Instead of a fixed template, use Claude API to generate a tailored prompt string for Kling. Kling takes a **single `prompt` field** (max 2,500 characters) - no system/user separation on the Kling side.
 
 The flow is:
 
 1. **Claude API call** generates the prompt (system + user prompt are for Claude, not Kling)
 2. **Claude's output** becomes the single `prompt` string sent to Kling
 
-**Claude system prompt (style guide — stays constant):**
+**Claude system prompt (style guide - stays constant):**
 ```
 You are a video ad prompt writer for a luxury jewellery brand. Given product details,
 write a single Kling image-to-video prompt (2-3 sentences). Always include:
 - Premium studio lighting with soft reflections
 - Slow cinematic camera motion (pan, orbit, or gentle zoom)
 - A clean, premium background (dark velvet, marble, or gradient)
-- Preserve the exact product design — no modifications
+- Preserve the exact product design - no modifications
 Keep the prompt under 200 words. Do not include any text overlays or voiceover directions.
 Output only the prompt text, nothing else.
 ```
@@ -200,7 +200,7 @@ Category: {product_category}
 Description: {product_description}
 ```
 
-**Claude responds with a prompt string → sent directly to Kling's `prompt` field:**
+**Claude responds with a prompt string -> sent directly to Kling's `prompt` field:**
 
 For a ring:
 > "A luxurious diamond solitaire ring rests on dark velvet. The camera slowly orbits the ring as studio lighting catches each facet, creating soft prismatic reflections. Gentle depth-of-field draws focus to the centre stone."
@@ -225,12 +225,12 @@ Each run supports:
 
 ## Provider Constraints (Kling API v3)
 
-- **Concurrency limit:** 5 simultaneous requests — queue additional requests if needed
-- **Single-shot duration:** 3–15 seconds (flexible in v3)
+- **Concurrency limit:** 5 simultaneous requests - queue additional requests if needed
+- **Single-shot duration:** 3-15 seconds (flexible in v3)
 - **Multi-shot:** Up to 6 scenes, max 15 seconds total, min 3 seconds per scene. Set `multi_shot: true` and provide a `multi_prompt` array with per-scene prompts and durations
-- **Image input:** `image_list` array — 1 image as `first_frame`, optionally 1 as `end_frame`. Note: multi-shot is incompatible with both first + end frame images
+- **Image input:** `image_list` array - 1 image as `first_frame`, optionally 1 as `end_frame`. Note: multi-shot is incompatible with both first + end frame images
 - **Prompt:** Single `prompt` string, max 2,500 characters. For multi-shot, use `multi_prompt` array instead (mutually exclusive with `prompt`)
-- **Output URL expiry:** Kling-hosted video URLs may expire — always download and upload to Supabase Storage
+- **Output URL expiry:** Kling-hosted video URLs may expire - always download and upload to Supabase Storage
 
 ## Error States
 
@@ -249,9 +249,60 @@ Frontend (Vercel):
 
 Supabase Edge Functions:
 - `KLING_ACCESS_KEY` (from Kling developer portal)
-- `KLING_SECRET_KEY` (from Kling developer portal — used with access key to generate JWT)
+- `KLING_SECRET_KEY` (from Kling developer portal - used with access key to generate JWT)
 - `GEMINI_API_KEY` (for Gemini prompt generation)
 - `WEBHOOK_SECRET` (optional but recommended)
+
+## Brand Ambassador Elements (Kling Custom Elements)
+
+This demo uses Kling **custom elements** as brand ambassadors.
+
+Important rule:
+- Only custom elements whose **name starts with `bluestone`** are eligible to be used in production runs.
+  - Example names: `bluestone-anya`, `bluestone-01`, `bluestone-muse-3`
+
+Why:
+- Prevents accidentally selecting leftover test elements (e.g. `codex-test`) when `create-run` picks a random ambassador.
+
+How to verify:
+- Call `GET /functions/v1/test-prompt?mode=elements` and check the `eligible: true` flag.
+- If there are **zero eligible** elements, `create-run` fails with a friendly error asking you to create `bluestone*` elements.
+
+Cleanup note:
+- This demo **never uses** elements whose names don’t start with `bluestone`, so leftover test elements are safe to ignore.
+- If you want to delete old custom elements, use the Kling console / account tooling (the JWT API used here documents create + list, but a delete endpoint isn’t currently wired into this repo).
+
+How to create a few elements quickly (local bulk upload):
+1. Copy `scripts/kling-elements-manifest.example.json` and update names + image paths (you can point to different folders on `D:\`).
+2. Set `KLING_ACCESS_KEY` and `KLING_SECRET_KEY` in your shell.
+3. Run `node scripts/kling-elements-upload.mjs --manifest "D:\path\to\elements.manifest.json"`
+   - If Kling expects data-URLs instead of raw Base64, rerun with `--data-url`.
+
+How to create a few elements quickly (Vercel-hosted images + Postman, no local keys):
+1. Add images to the frontend repo (example structure):
+   - `frontend/public/kling-elements/bluestone-anya/front.jpg`
+   - `frontend/public/kling-elements/bluestone-anya/ref1.jpg`
+   - This repo also includes sample sets for `bluestone-muse-01` -> `bluestone-muse-04` under `frontend/public/kling-elements/`.
+2. Deploy the frontend to Vercel (the images must be publicly reachable by URL for Kling to ingest them).
+3. Call the existing Edge Function (no new function):
+   - `POST /functions/v1/test-prompt?mode=elements-create`
+   - Header: `x-admin-secret: <WEBHOOK_SECRET>`
+   - Body example (or start from `scripts/bluestone-elements-create.example.json`):
+     ```json
+     {
+       "assets_base_url": "https://<your-vercel-domain>",
+        "elements": [
+          {
+           "name": "bluestone-anya",
+           "frontal_path": "/kling-elements/bluestone-anya/front.jpg",
+           "ref_paths": ["/kling-elements/bluestone-anya/ref1.jpg", "/kling-elements/bluestone-anya/ref2.jpg"]
+         }
+       ]
+     }
+     ```
+
+Note:
+- These images are not linked from the UI, but any publicly reachable URL is technically accessible if someone knows the exact path.
 
 ## Success Criteria
 

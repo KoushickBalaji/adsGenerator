@@ -1,8 +1,14 @@
 // Kling API client for Supabase Edge Functions (Deno)
-// Official API: https://api.klingai.com
 // Auth: Access Key + Secret Key → JWT token → Bearer header
+//
+// ⚠️ Docs (new system): https://api-singapore.klingai.com
+// Some older accounts still work on https://api.klingai.com
+const KLING_BASE_URL = (Deno.env.get("KLING_BASE_URL") ??
+  "https://api-singapore.klingai.com").replace(/\/+$/, "");
 
-const KLING_BASE_URL = "https://api.klingai.com";
+// Non-secret config: for this demo, ONLY use custom elements whose names start with this prefix.
+// This prevents accidentally selecting leftover test elements from the Kling account.
+export const BRAND_ELEMENT_NAME_PREFIX = "bluestone";
 
 // JWT token cache — reuse until close to expiry
 let cachedToken: string | null = null;
@@ -111,52 +117,187 @@ export type KlingElementsResponse = {
     total?: number;
     pageNum?: number;
     pageSize?: number;
+    list?: unknown[];
   };
 };
 
 // ─── Elements API ───
 
-/** List available elements from the Kling account */
-export async function listElements(
+type KlingGeneralElement = {
+  id?: string | number;
+  name?: string;
+  description?: string;
+  element_id?: string | number;
+  element_name?: string;
+  element_description?: string;
+  type?: string;
+};
+
+export type CreateCustomElementRequest = {
+  element_name: string;
+  element_description: string;
+  // Can be a publicly accessible URL OR a base64/data-url string depending on account/API.
+  element_frontal_image: string;
+  element_refer_list: Array<{
+    image_url: string;
+  }>;
+};
+
+export type CreateCustomElementResponse = {
+  code: number;
+  message: string;
+  request_id: string;
+  data?: unknown;
+};
+
+function parseJsonPreservingLargeIds(text: string): any {
+  // Kling element IDs can exceed JS' MAX_SAFE_INTEGER; if parsed as numbers we lose precision
+  // and later send the wrong id back to Kling ("Element id not found").
+  const trimmed = text.trim();
+  // Kling sometimes returns an empty response body for out-of-range pages; treat as no data.
+  if (!trimmed) return null;
+
+  const patched = trimmed.replace(
+    /("(?:element_id|id)"\s*:\s*)(\d{16,})(?=\s*[,}])/g,
+    '$1"$2"'
+  );
+  return JSON.parse(patched);
+}
+
+export function isElementNameEligible(
+  name: string,
+  prefix = BRAND_ELEMENT_NAME_PREFIX
+): boolean {
+  const n = name.trim().toLowerCase();
+  const p = prefix.trim().toLowerCase();
+  return p.length > 0 && n.startsWith(p);
+}
+
+function normalizeElements(raw: unknown): KlingElement[] {
+  const arr = Array.isArray(raw) ? (raw as KlingGeneralElement[]) : [];
+  return arr
+    .map((e) => {
+      // Prefer element_id/element_name when present (those are the identifiers expected by
+      // downstream video APIs). Fall back to id/name for endpoints that only provide those.
+      const id = e?.element_id ?? e?.id;
+      const name = e?.element_name ?? e?.name;
+      if (!id || !name) return null;
+
+      const type =
+        e?.type === "VIDEO" || e?.type === "IMAGE"
+          ? (e.type as "VIDEO" | "IMAGE")
+          : "IMAGE";
+
+      const description =
+        e?.description ??
+        (e?.element_description ? String(e.element_description) : undefined);
+
+      return {
+        id: String(id),
+        name: String(name),
+        type,
+        description,
+      } satisfies KlingElement;
+    })
+    .filter(Boolean) as KlingElement[];
+}
+
+async function listElementsFromGeneralEndpoint(
+  path: "/v1/general/custom-elements" | "/v1/general/presets-elements",
   pageNum = 1,
   pageSize = 50
 ): Promise<KlingElement[]> {
   const headers = await getHeaders();
-
-  const url = `${KLING_BASE_URL}/v1/elements?pageNum=${pageNum}&pageSize=${pageSize}`;
+  const url = `${KLING_BASE_URL}${path}?pageNum=${pageNum}&pageSize=${pageSize}`;
   console.log("[listElements] Fetching:", url);
 
   const res = await fetch(url, { method: "GET", headers });
-
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Kling elements API error ${res.status}: ${text}`);
   }
 
-  const data = await res.json();
-  console.log("[listElements] Raw response:", JSON.stringify(data).slice(0, 500));
-
-  // Handle different response shapes
-  const elements =
-    data?.data?.elementsList ||
+  const text = await res.text();
+  const data = parseJsonPreservingLargeIds(text);
+  const rawElements =
+    data?.data?.list ||
     data?.data?.elements ||
+    data?.data?.elementsList ||
     data?.data ||
+    data?.list ||
+    data?.elements ||
+    data?.elementsList ||
+    data ||
     [];
 
-  const result = Array.isArray(elements) ? elements : [];
-  console.log(`[listElements] Found ${result.length} elements`);
-  return result;
+  const normalized = normalizeElements(rawElements);
+  console.log(`[listElements] Found ${normalized.length} elements`);
+  return normalized;
 }
 
-/** Pick a random element from the account — throws on failure instead of silently returning null */
-export async function getRandomElement(): Promise<KlingElement | null> {
-  const elements = await listElements();
+/** List available CUSTOM elements from the Kling account (brand-owned subjects). */
+export async function listCustomElements(pageNum = 1, pageSize = 50) {
+  return listElementsFromGeneralEndpoint(
+    "/v1/general/custom-elements",
+    pageNum,
+    pageSize
+  );
+}
+
+/** List available PRESET elements from the Kling account (Kling's preset library). */
+export async function listPresetElements(pageNum = 1, pageSize = 50) {
+  return listElementsFromGeneralEndpoint(
+    "/v1/general/presets-elements",
+    pageNum,
+    pageSize
+  );
+}
+
+/** Create a CUSTOM element (brand-owned subject) */
+export async function createCustomElement(
+  req: CreateCustomElementRequest
+): Promise<CreateCustomElementResponse> {
+  const headers = await getHeaders();
+  const url = `${KLING_BASE_URL}/v1/general/custom-elements`;
+  console.log("[createCustomElement] Creating:", req.element_name);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(req),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Kling custom-elements API error ${res.status}: ${text}`);
+  }
+
+  const data = parseJsonPreservingLargeIds(text);
+  return data as CreateCustomElementResponse;
+}
+
+/** Pick a random CUSTOM element from the account */
+export async function getRandomElement(opts: {
+  namePrefix?: string;
+} = {}): Promise<KlingElement | null> {
+  const elements = await listCustomElements();
   if (elements.length === 0) {
-    console.warn("[getRandomElement] No elements found in Kling account — will use product-only prompt");
+    console.warn("[getRandomElement] No custom elements found in Kling account");
     return null;
   }
-  const idx = Math.floor(Math.random() * elements.length);
-  const picked = elements[idx];
+
+  const prefix = opts.namePrefix ?? BRAND_ELEMENT_NAME_PREFIX;
+  const eligible = elements.filter((e) => isElementNameEligible(e.name, prefix));
+  if (eligible.length === 0) {
+    console.warn(
+      `[getRandomElement] No eligible custom elements found (expected prefix "${prefix}"). ` +
+        `Found ${elements.length} custom element(s) total.`
+    );
+    return null;
+  }
+
+  const idx = Math.floor(Math.random() * eligible.length);
+  const picked = eligible[idx];
   console.log(`[getRandomElement] Picked element: ${picked.name} (${picked.id})`);
   return picked;
 }
@@ -215,32 +356,44 @@ export async function createImageToVideo(
   return res.json();
 }
 
-/** Create a multi-elements video task (with brand ambassador + product) */
-export async function createMultiElementsVideo(
-  req: CreateMultiElementsVideoRequest
+export type CreateOmniVideoRequest = {
+  model_name: string;
+  prompt: string;
+  image_list?: Array<{ image_url: string; type?: "first_frame" | "end_frame" }>;
+  element_list?: Array<{ element_id: string }>;
+  video_list?: Array<{
+    video_url: string;
+    refer_type?: string;
+    keep_original_sound?: string;
+  }>;
+  mode?: "std" | "pro";
+  aspect_ratio?: string;
+  duration?: string;
+  callback_url?: string;
+  external_task_id?: string;
+};
+
+/** Create an Omni-Video task (O-series models like kling-video-o1 / kling-video-o3). */
+export async function createOmniVideo(
+  req: CreateOmniVideoRequest
 ): Promise<KlingResponse> {
   const headers = await getHeaders();
 
-  // Build the request body, only including defined fields
   const body: Record<string, unknown> = {
-    model_name: req.model_name ?? "kling-v3-0",
+    model_name: req.model_name,
     prompt: req.prompt,
-    duration: req.duration ?? "5",
+    mode: req.mode ?? "pro",
     aspect_ratio: req.aspect_ratio ?? "16:9",
-    mode: req.mode ?? "std",
+    duration: req.duration ?? "5",
   };
 
-  if (req.image_0) body.image_0 = req.image_0;
-  if (req.image_1) body.image_1 = req.image_1;
-  if (req.image_2) body.image_2 = req.image_2;
-  if (req.image_3) body.image_3 = req.image_3;
-  if (req.element_1) body.element_1 = req.element_1;
-  if (req.element_2) body.element_2 = req.element_2;
-  if (req.element_3) body.element_3 = req.element_3;
-  if (req.negative_prompt) body.negative_prompt = req.negative_prompt;
+  if (req.image_list) body.image_list = req.image_list;
+  if (req.element_list) body.element_list = req.element_list;
+  if (req.video_list) body.video_list = req.video_list;
   if (req.callback_url) body.callback_url = req.callback_url;
+  if (req.external_task_id) body.external_task_id = req.external_task_id;
 
-  const res = await fetch(`${KLING_BASE_URL}/v1/videos/multi-elements`, {
+  const res = await fetch(`${KLING_BASE_URL}/v1/videos/omni-video`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -248,7 +401,7 @@ export async function createMultiElementsVideo(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Kling multi-elements API error ${res.status}: ${text}`);
+    throw new Error(`Kling omni-video API error ${res.status}: ${text}`);
   }
 
   return res.json();
@@ -258,10 +411,12 @@ export async function createMultiElementsVideo(
 export async function getTaskStatus(taskId: string): Promise<KlingResponse> {
   const headers = await getHeaders();
 
-  // Try multi-elements status first, fall back to image2video
+  // Try Omni-Video first (O-series), then legacy endpoints for older runs.
   for (const path of [
+    `/v1/videos/omni-video/${taskId}`,
     `/v1/videos/multi-elements/${taskId}`,
     `/v1/videos/image2video/${taskId}`,
+    `/v1/videos/text2video/${taskId}`,
   ]) {
     const res = await fetch(`${KLING_BASE_URL}${path}`, {
       method: "GET",

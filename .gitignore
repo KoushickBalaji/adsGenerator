@@ -23,3 +23,6 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# Local-only element source assets (copied into frontend/public for Vercel hosting)
+Element Sources/

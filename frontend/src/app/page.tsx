@@ -118,7 +118,14 @@ export default function Home() {
       });
 
       if (res.error) {
-        throw new Error(res.error.message || "Failed to start generation");
+        const serverMessage = await readEdgeFunctionError(res.response);
+        const fallbackMessage =
+          res.error.message === "Edge Function returned a non-2xx status code"
+            ? "Something unexpected happened. Please try again."
+            : res.error.message;
+        throw new Error(
+          serverMessage || fallbackMessage || "Failed to start generation"
+        );
       }
 
       const { runId } = res.data;
@@ -138,7 +145,13 @@ export default function Home() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       // Network-level failures get a friendly message; backend errors are already friendly
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("CORS")) {
+      if (
+        msg.includes("Failed to fetch") ||
+        msg.includes("NetworkError") ||
+        msg.includes("CORS") ||
+        msg.includes("Relay Error invoking the Edge Function") ||
+        msg.includes("Failed to send a request to the Edge Function")
+      ) {
         setError("Unable to reach the server. Please check your connection and try again.");
       } else {
         setError(msg || "Something unexpected happened. Please try again.");
@@ -176,6 +189,27 @@ export default function Home() {
 
   function handleSelectRun(run: VideoRun) {
     setActiveRun(run);
+  }
+
+  async function readEdgeFunctionError(response?: Response) {
+    if (!response) return "";
+
+    const contentType = response.headers.get("content-type") || "";
+
+    try {
+      if (contentType.includes("application/json")) {
+        const json = (await response.json()) as unknown;
+        const msg =
+          (json as { error?: unknown; message?: unknown })?.error ??
+          (json as { error?: unknown; message?: unknown })?.message;
+
+        return typeof msg === "string" ? msg : "";
+      }
+
+      return await response.text();
+    } catch {
+      return "";
+    }
   }
 
   return (

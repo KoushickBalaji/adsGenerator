@@ -1,31 +1,19 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { scrapeProduct } from "../_shared/scraper.ts";
+import { generateKlingPromptWithGemini } from "../_shared/geminiPrompt.ts";
+import {
+  BRAND_ELEMENT_NAME_PREFIX,
+  createCustomElement,
+  isElementNameEligible,
+  listCustomElements,
+  listPresetElements,
+} from "../_shared/kling.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-admin-secret",
 };
-
-/**
- * Fetch an image URL and return it as a base64-encoded data part for Gemini.
- */
-async function imageUrlToGeminiPart(
-  url: string
-): Promise<{ inline_data: { mime_type: string; data: string } } | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") || "image/jpeg";
-    const buffer = await res.arrayBuffer();
-    const base64 = btoa(
-      String.fromCharCode(...new Uint8Array(buffer))
-    );
-    return { inline_data: { mime_type: contentType, data: base64 } };
-  } catch {
-    return null;
-  }
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -33,108 +21,452 @@ serve(async (req) => {
   }
 
   try {
-    const { url } = await req.json();
+    // Utility mode: list Kling elements visible to the API credentials.
+    // Note: production only uses CUSTOM elements whose names start with BRAND_ELEMENT_NAME_PREFIX.
+    // GET /functions/v1/test-prompt?mode=elements&kind=custom|preset|all&all=true&pageSize=100&maxPages=20
+    const reqUrl = new URL(req.url);
+    const mode = reqUrl.searchParams.get("mode");
+    if (req.method === "GET" && mode === "elements") {
+      const kind = reqUrl.searchParams.get("kind") ?? "all";
+      const allPages = reqUrl.searchParams.get("all") === "true";
 
-    // Step 1: Scrape product
-    const product = await scrapeProduct(url);
-    const images = product.input_images.slice(0, 3);
+      const pageNumRaw = reqUrl.searchParams.get("pageNum") ?? "1";
+      const pageSizeRaw = reqUrl.searchParams.get("pageSize") ?? "50";
+      const pageNum = Math.max(1, Number(pageNumRaw) || 1);
+      const pageSize = Math.min(100, Math.max(1, Number(pageSizeRaw) || 50));
+      const maxPages = Math.min(
+        50,
+        Math.max(1, Number(reqUrl.searchParams.get("maxPages") ?? "10") || 10)
+      );
 
-    // Step 2: Fetch images as base64 for Gemini vision
-    const imageParts = (
-      await Promise.all(images.map((imgUrl) => imageUrlToGeminiPart(imgUrl)))
-    ).filter(Boolean);
+      const baseUrl =
+        (Deno.env.get("KLING_BASE_URL") ?? "https://api-singapore.klingai.com")
+          .replace(/\/+$/, "");
 
-    // Build image label parts so Gemini knows which token maps to which image
-    const imageLabels = images
-      .map((_, i) => `@image_${i}`)
-      .join(", ");
+      async function listAllPages(
+        which: "custom" | "preset"
+      ): Promise<Awaited<ReturnType<typeof listCustomElements>>> {
+        const out: Awaited<ReturnType<typeof listCustomElements>> = [];
+        for (let page = 1; page <= maxPages; page++) {
+          const res =
+            which === "custom"
+              ? await listCustomElements(page, pageSize)
+              : await listPresetElements(page, pageSize);
+          out.push(...res);
+          if (res.length < pageSize) break;
+        }
+        return out;
+      }
 
-    const systemPrompt = `You are a creative director writing Kling AI video prompts for luxury jewellery ad films.
+      const custom =
+        kind === "custom" || kind === "all"
+          ? allPages
+            ? await listAllPages("custom")
+            : await listCustomElements(pageNum, pageSize)
+          : undefined;
 
-You will be shown reference images of a jewellery piece. Study them carefully — notice the type of jewellery, the metal color, the stones, and how it looks when worn.
+      const preset =
+        kind === "preset" || kind === "all"
+          ? allPages
+            ? await listAllPages("preset")
+            : await listPresetElements(pageNum, pageSize)
+          : undefined;
 
-REFERENCE TOKENS (you MUST use these — they map to real assets in the video engine):
-- @element_1 = a brand ambassador (real person, will be composited into the video)
-- ${images.map((_, i) => `@image_${i} = reference image ${i + 1} of the jewellery piece (shown below)`).join("\n- ")}
+      const eligiblePrefix = BRAND_ELEMENT_NAME_PREFIX;
+      const withEligibility = <T extends { id: string; name: string }>(elements: T[]) =>
+        elements.map((e) => ({
+          ...e,
+          eligible: isElementNameEligible(e.name, eligiblePrefix),
+        }));
 
-CRITICAL RULES:
-1. MUST include @element_1 at least once — she is the star of the ad.
-2. MUST include at least one @image_N token (${imageLabels}) to anchor the product in the scene.
-3. NEVER use the product's name, brand name, or any proper noun. Kling doesn't know product names — using them causes visual hallucinations (e.g. "Lotus Ring" generates an actual lotus). Refer to the piece only as "the ${product.product_category}" or via the @image token.
-4. Write a STORYLINE, not a product shot. Think 5-second ad film: the ambassador has a moment, an emotion, a real-life setting. The jewellery is part of her world, not the sole focus.
-5. @element_1 should be WEARING the ${product.product_category} naturally — part of her everyday look, not "presenting" or "revealing" it.
-6. ONE continuous camera move (tracking, dolly, slow push-in, handheld follow). No cuts.
-7. Set a REAL-LIFE scene. Pick from a wide range — everyday moments are powerful:
-   - Professional: giving a presentation, typing at a laptop, leading a meeting
-   - Active: morning jog, yoga, gym, playing a sport
-   - Social: laughing with friends at a café, school pickup, grocery shopping
-   - Intimate: reading on the couch, cooking dinner, morning coffee on a balcony
-   - Aspirational: rooftop at golden hour, gallery opening, boarding a flight
-   The jewellery should feel like something she never takes off — part of every moment.
-8. Include subtle motion: hair, fabric, ambient light, natural reflections.
-9. Do NOT mention text, voiceover, music, logos, titles, or sound.
-10. Output ONLY the raw prompt — no quotes, no markdown, no explanation.
-11. 3-5 sentences, 60-120 words.
+      const customWithEligibility = custom ? withEligibility(custom) : undefined;
+      const presetWithEligibility = preset ? withEligibility(preset) : undefined;
 
-GOOD EXAMPLES:
-"@element_1 stands at the front of a bright conference room, gesturing confidently at a presentation screen. The camera slowly dollies in from the back of the room. Natural daylight from floor-to-ceiling windows catches @image_0 on her wrist as she moves her hand, casting a brief warm reflection on the glass table."
+      const summary = {
+        eligible_prefix: eligiblePrefix,
+        custom_count: custom?.length ?? 0,
+        preset_count: preset?.length ?? 0,
+        total_count: (custom?.length ?? 0) + (preset?.length ?? 0),
+        eligible_custom_count: customWithEligibility?.filter((e) => e.eligible).length ?? 0,
+        eligible_preset_count: presetWithEligibility?.filter((e) => e.eligible).length ?? 0,
+        eligible_total_count:
+          (customWithEligibility?.filter((e) => e.eligible).length ?? 0) +
+          (presetWithEligibility?.filter((e) => e.eligible).length ?? 0),
+      };
 
-"@element_1 jogs along a tree-lined path in early morning light, her breath visible in the cool air. The camera tracks alongside her in a smooth handheld follow. As she slows to a walk and pushes hair from her face, @image_1 catches a shaft of golden sunlight filtering through the leaves."
+      function normalizeName(name: string): string {
+        return name.trim().toLowerCase().replace(/\s+/g, " ");
+      }
 
-"@element_1 sits cross-legged on a living room couch, a paperback open in her lap and a steaming mug beside her. Soft afternoon light drifts through sheer curtains. The camera slowly pushes in as she turns a page — @image_0 on her finger glints quietly in the warm light."
+      function findDuplicates(elements: Array<{ id: string; name: string }>) {
+        const map = new Map<string, { name: string; ids: string[] }>();
+        for (const el of elements) {
+          const key = normalizeName(el.name);
+          const entry = map.get(key) ?? { name: el.name.trim(), ids: [] };
+          entry.ids.push(el.id);
+          map.set(key, entry);
+        }
+        return Array.from(map.values())
+          .filter((v) => v.ids.length > 1)
+          .sort((a, b) => b.ids.length - a.ids.length);
+      }
 
-BAD EXAMPLES (DO NOT write like these):
-- "A slow orbit around the Solaris Ring on dark velvet" ← product shot, no story, uses product name
-- "@element_1 presents @image_0 under studio lights" ← no narrative, catalog feel
-- "@element_1 at a glamorous gala wearing @image_0" ← lazy, always defaults to luxury events`;
-
-    // Build multimodal user message: text + images
-    const userParts: Array<Record<string, unknown>> = [];
-
-    // Add text instruction first
-    userParts.push({
-      text: `Here are the reference images of the ${product.product_category}. Study them, then write a Kling video ad prompt.\n\nRemember: @element_1 is the ambassador. ${imageLabels} are the product images shown below — use whichever feels natural. Tell a story.`,
-    });
-
-    // Add each image with a label
-    for (let i = 0; i < imageParts.length; i++) {
-      userParts.push({ text: `\n@image_${i}:` });
-      userParts.push(imageParts[i]!);
+      return json(
+        {
+          mode: "elements",
+          base_url: baseUrl,
+          kind,
+          paging: allPages
+            ? { mode: "all", pageSize, maxPages }
+            : { mode: "page", pageNum, pageSize },
+          summary,
+          cleanup: {
+            custom_duplicates: custom ? findDuplicates(custom) : [],
+            preset_duplicates: preset ? findDuplicates(preset) : [],
+          },
+          custom: customWithEligibility,
+          preset: presetWithEligibility,
+        },
+        200
+      );
     }
 
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) throw new Error("GEMINI_API_KEY not set");
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: userParts }],
-          generationConfig: {
-            maxOutputTokens: 1024,
-            temperature: 0.7,
-            thinkingConfig: { thinkingBudget: 4096 },
-          },
-        }),
+    // Utility mode: bulk-create Kling custom elements from publicly accessible image URLs.
+    // POST /functions/v1/test-prompt?mode=elements-create
+    // Headers: x-admin-secret: <WEBHOOK_SECRET>
+    // Body:
+    // {
+    //   "assets_base_url": "https://<your-vercel-deployment>",
+    //   "elements": [
+    //     {
+    //       "name": "bluestone-anya",
+    //       "description": "Optional",
+    //       "frontal_path": "/kling-elements/bluestone-anya/front.jpg",
+    //       "ref_paths": ["/kling-elements/bluestone-anya/ref1.jpg"]
+    //     }
+    //   ],
+    //   "dry_run": false,
+    //   "on_existing": "skip"
+    // }
+    if (req.method === "POST" && mode === "elements-create") {
+      const adminSecret = req.headers.get("x-admin-secret") ?? "";
+      const expected = Deno.env.get("WEBHOOK_SECRET") ?? "";
+      if (!expected) {
+        return json({ error: "Server misconfigured: WEBHOOK_SECRET not set" }, 500);
       }
+      if (adminSecret !== expected) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+
+      const body = (await req.json()) as Record<string, unknown>;
+      const assetsBaseUrlRaw =
+        (body.assets_base_url as string | undefined) ??
+        (body.assetsBaseUrl as string | undefined);
+
+      if (!assetsBaseUrlRaw || typeof assetsBaseUrlRaw !== "string") {
+        return json({ error: "Missing assets_base_url" }, 400);
+      }
+
+      let assetsBaseUrl: URL;
+      try {
+        assetsBaseUrl = new URL(assetsBaseUrlRaw);
+      } catch {
+        return json({ error: "Invalid assets_base_url (must be a full URL)" }, 400);
+      }
+
+      if (assetsBaseUrl.protocol !== "https:" && assetsBaseUrl.protocol !== "http:") {
+        return json({ error: "assets_base_url must be http(s)" }, 400);
+      }
+
+      const elementsRaw = body.elements;
+      if (!Array.isArray(elementsRaw) || elementsRaw.length === 0) {
+        return json({ error: "Missing elements (array)" }, 400);
+      }
+      if (elementsRaw.length > 10) {
+        return json({ error: "Too many elements in one request (max 10)" }, 400);
+      }
+
+      const dryRun =
+        (body.dry_run as boolean | undefined) ?? (body.dryRun as boolean | undefined) ??
+        false;
+      const onExisting =
+        (body.on_existing as string | undefined) ?? (body.onExisting as string | undefined) ??
+        "skip";
+
+      function resolveAssetUrl(
+        maybeUrl: unknown,
+        maybePath: unknown
+      ): string | null {
+        if (typeof maybeUrl === "string" && /^https?:\/\//i.test(maybeUrl.trim())) {
+          return maybeUrl.trim();
+        }
+        if (typeof maybePath !== "string") return null;
+        const p = maybePath.trim();
+        if (!p.startsWith("/") || p.includes("..")) return null;
+        return new URL(p, assetsBaseUrl).toString();
+      }
+
+      async function probeImageUrl(imageUrl: string): Promise<{ ok: boolean; status: number; content_type?: string }> {
+        try {
+          const head = await fetch(imageUrl, { method: "HEAD" });
+          if (head.ok) {
+            return {
+              ok: true,
+              status: head.status,
+              content_type: head.headers.get("content-type") ?? undefined,
+            };
+          }
+          // Some servers might not support HEAD; fall back to a minimal GET.
+          if (head.status === 405) {
+            const get = await fetch(imageUrl, {
+              method: "GET",
+              headers: { Range: "bytes=0-0" },
+            });
+            return {
+              ok: get.ok,
+              status: get.status,
+              content_type: get.headers.get("content-type") ?? undefined,
+            };
+          }
+          return { ok: false, status: head.status };
+        } catch {
+          return { ok: false, status: 0 };
+        }
+      }
+
+      // Load all existing custom elements so we can skip duplicates by name.
+      const existing = (() => {
+        const map = new Map<string, { id: string; name: string }>();
+        return { map };
+      })();
+
+      // Keep this bounded; most accounts have a small set of custom elements.
+      for (let page = 1; page <= 20; page++) {
+        const pageEls = await listCustomElements(page, 100);
+        for (const el of pageEls) {
+          existing.map.set(el.name.trim().toLowerCase(), { id: el.id, name: el.name });
+        }
+        if (pageEls.length < 100) break;
+      }
+
+      type NormalizedInput = {
+        name: string;
+        description: string;
+        frontal_url: string;
+        ref_urls: string[];
+      };
+
+      const normalized: NormalizedInput[] = [];
+      const validationErrors: Array<{ index: number; name?: string; error: string }> = [];
+
+      for (let i = 0; i < elementsRaw.length; i++) {
+        const el = elementsRaw[i] as Record<string, unknown>;
+        const name = String(el?.name ?? "").trim();
+        if (!name) {
+          validationErrors.push({ index: i, error: "Missing element name" });
+          continue;
+        }
+        if (!isElementNameEligible(name, BRAND_ELEMENT_NAME_PREFIX)) {
+          validationErrors.push({
+            index: i,
+            name,
+            error: `Element name must start with "${BRAND_ELEMENT_NAME_PREFIX}"`,
+          });
+          continue;
+        }
+
+        const description =
+          typeof el?.description === "string" && el.description.trim().length > 0
+            ? el.description.trim()
+            : name;
+
+        const frontalUrl = resolveAssetUrl(el?.frontal_url ?? el?.frontalUrl, el?.frontal_path ?? el?.frontalPath);
+        if (!frontalUrl) {
+          validationErrors.push({
+            index: i,
+            name,
+            error: "Missing frontal_url/frontal_path (must be a full URL or an absolute path starting with /)",
+          });
+          continue;
+        }
+
+        const refUrlsRaw =
+          (Array.isArray(el?.ref_urls) ? el.ref_urls : undefined) ??
+          (Array.isArray(el?.refUrls) ? el.refUrls : undefined);
+        const refPathsRaw =
+          (Array.isArray(el?.ref_paths) ? el.ref_paths : undefined) ??
+          (Array.isArray(el?.refPaths) ? el.refPaths : undefined);
+
+        const refUrlsResolved: string[] = [];
+        if (Array.isArray(refUrlsRaw)) {
+          for (const u of refUrlsRaw) {
+            const resolved = resolveAssetUrl(u, null);
+            if (resolved) refUrlsResolved.push(resolved);
+          }
+        }
+        if (Array.isArray(refPathsRaw)) {
+          for (const p of refPathsRaw) {
+            const resolved = resolveAssetUrl(null, p);
+            if (resolved) refUrlsResolved.push(resolved);
+          }
+        }
+
+        const refUrls = refUrlsResolved.filter(Boolean);
+        if (refUrls.length < 1 || refUrls.length > 3) {
+          validationErrors.push({
+            index: i,
+            name,
+            error: "Provide 1-3 reference images via ref_urls/ref_paths",
+          });
+          continue;
+        }
+
+        normalized.push({
+          name,
+          description,
+          frontal_url: frontalUrl,
+          ref_urls: refUrls,
+        });
+      }
+
+      // Preflight probes before any creation
+      for (let i = 0; i < normalized.length; i++) {
+        const el = normalized[i];
+        const urls = [el.frontal_url, ...el.ref_urls];
+        const probes = await Promise.all(urls.map((u) => probeImageUrl(u)));
+        const badIdx = probes.findIndex((p) => !p.ok);
+        if (badIdx !== -1) {
+          validationErrors.push({
+            index: i,
+            name: el.name,
+            error: `Image URL not reachable (${urls[badIdx]}). Status: ${probes[badIdx].status || "network error"}`,
+          });
+        }
+      }
+
+      if (validationErrors.length > 0) {
+        return json(
+          {
+            error: "Validation failed",
+            eligible_prefix: BRAND_ELEMENT_NAME_PREFIX,
+            assets_base_url: assetsBaseUrl.toString(),
+            details: validationErrors,
+          },
+          400
+        );
+      }
+
+      const results: Array<Record<string, unknown>> = [];
+      for (const el of normalized) {
+        const existingMatch = existing.map.get(el.name.trim().toLowerCase());
+        if (existingMatch) {
+          if (onExisting === "error") {
+            results.push({
+              name: el.name,
+              status: "error",
+              error: `Element already exists (${existingMatch.name} / ${existingMatch.id})`,
+            });
+            continue;
+          }
+          results.push({
+            name: el.name,
+            status: "skipped_existing",
+            existing: existingMatch,
+          });
+          continue;
+        }
+
+        const reqBody = {
+          element_name: el.name,
+          element_description: el.description,
+          element_frontal_image: el.frontal_url,
+          element_refer_list: el.ref_urls.map((u) => ({ image_url: u })),
+        };
+
+        if (dryRun) {
+          results.push({ name: el.name, status: "dry_run", request: reqBody });
+          continue;
+        }
+
+        const res = await createCustomElement(reqBody);
+        results.push({ name: el.name, status: "created", response: res });
+      }
+
+      return json(
+        {
+          mode: "elements-create",
+          eligible_prefix: BRAND_ELEMENT_NAME_PREFIX,
+          assets_base_url: assetsBaseUrl.toString(),
+          dry_run: dryRun,
+          results,
+        },
+        200
+      );
+    }
+
+    // Default mode: generate the Gemini prompt for a given BlueStone product URL.
+    // This is intentionally POST-only to avoid confusing "Unexpected end of JSON input"
+    // errors when calling the function with GET from tools like Postman.
+    if (req.method !== "POST") {
+      return json(
+        {
+          error:
+            "Method not allowed. Use POST with JSON body { \"url\": \"https://www.bluestone.com/...\" } " +
+            "or GET with mode=elements to list Kling elements.",
+        },
+        405
+      );
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      const text = await req.text();
+      if (!text.trim()) {
+        return json({ error: "Missing JSON body" }, 400);
+      }
+      body = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return json({ error: "Invalid JSON body" }, 400);
+    }
+
+    const url = body.url;
+
+    // Validate URL (match create-run behavior)
+    if (!url || typeof url !== "string") {
+      return json({ error: "Missing url" }, 400);
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return json({ error: "Invalid URL" }, 400);
+    }
+
+    if (!parsed.hostname.includes("bluestone.com")) {
+      return json({ error: "Only BlueStone URLs are supported" }, 400);
+    }
+
+    // Scrape product (same as production)
+    const product = await scrapeProduct(url);
+
+    // Generate Gemini prompt using the exact same logic as create-run
+    const { prompt, request } = await generateKlingPromptWithGemini(
+      {
+        product_title: product.product_title,
+        product_description: product.product_description,
+        product_category: product.product_category,
+      },
+      product.input_images.length
     );
 
-    if (!geminiRes.ok) {
-      const text = await geminiRes.text();
-      throw new Error(`Gemini error ${geminiRes.status}: ${text}`);
-    }
-
-    const geminiData = await geminiRes.json();
-    const generatedPrompt =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    // Validate: must have @element_1 and at least one @image_N
-    const hasElement1 = generatedPrompt?.includes("@element_1") ?? false;
-    const hasAnyImage =
-      /\@image_\d/.test(generatedPrompt || "");
+    const expectedImageTokens = request.imageRefs;
+    const imageTokensUsed = expectedImageTokens.filter((t) =>
+      prompt.includes(t)
+    );
+    const hasElement1 = prompt.includes("<<<element_1>>>");
+    const hasShot1 = /^\s*(?:-\s*)?Shot 1 \(0-5s\):/m.test(prompt);
+    const hasShot2 = /^\s*(?:-\s*)?Shot 2 \(5-10s\):/m.test(prompt);
 
     return json({
       status: "dry_run_complete",
@@ -144,11 +476,24 @@ BAD EXAMPLES (DO NOT write like these):
         image_count: product.input_images.length,
         images: product.input_images,
       },
-      prompt: {
-        generated: generatedPrompt,
+      gemini: {
+        model: request.model,
+        generation_config: request.generationConfig,
+        system_prompt: request.systemPrompt,
+        user_message: request.userMessage,
+        output: prompt,
+      },
+      validation: {
         has_element_1: hasElement1,
-        has_image_ref: hasAnyImage,
-        valid: hasElement1 && hasAnyImage,
+        has_shot_1: hasShot1,
+        has_shot_2: hasShot2,
+        image_tokens_used: imageTokensUsed,
+        image_tokens_expected: expectedImageTokens,
+        valid:
+          hasElement1 &&
+          hasShot1 &&
+          hasShot2 &&
+          imageTokensUsed.length === expectedImageTokens.length,
       },
     });
   } catch (err) {

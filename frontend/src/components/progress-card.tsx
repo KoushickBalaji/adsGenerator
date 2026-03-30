@@ -17,15 +17,15 @@ const STATUS_COLORS: Record<VideoRun["status"], string> = {
 
 // Pipeline steps shown during processing
 const PIPELINE_STEPS = [
-  { label: "Extracting product details", icon: "search", duration: 4000 },
-  { label: "Analysing jewellery design", icon: "gem", duration: 5000 },
-  { label: "Selecting brand ambassador", icon: "user", duration: 4000 },
-  { label: "Crafting video prompt", icon: "sparkle", duration: 5000 },
-  { label: "Composing scene layout", icon: "layout", duration: 6000 },
-  { label: "Generating video frames", icon: "film", duration: 15000 },
-  { label: "Rendering cinematic motion", icon: "clapperboard", duration: 20000 },
-  { label: "Applying studio lighting", icon: "sun", duration: 10000 },
-  { label: "Polishing final output", icon: "sparkles", duration: 10000 },
+  { label: "Getting to know the piece", icon: "search", duration: 4000 },
+  { label: "Noticing the little details", icon: "gem", duration: 5000 },
+  { label: "Casting the muse", icon: "user", duration: 4000 },
+  { label: "Shaping the storyline", icon: "sparkle", duration: 5000 },
+  { label: "Setting the scene", icon: "layout", duration: 6000 },
+  { label: "Capturing the moment", icon: "film", duration: 15000 },
+  { label: "Bringing it to life", icon: "clapperboard", duration: 20000 },
+  { label: "Setting the mood lighting", icon: "sun", duration: 10000 },
+  { label: "Adding final touches", icon: "sparkles", duration: 10000 },
 ];
 
 function StepIcon({ icon, className }: { icon: string; className?: string }) {
@@ -92,7 +92,6 @@ function StepIcon({ icon, className }: { icon: string; className?: string }) {
 }
 
 function ProcessingPipeline({ startedAt }: { startedAt: string }) {
-  const [activeStep, setActiveStep] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -103,19 +102,18 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
     return () => clearInterval(interval);
   }, [startedAt]);
 
-  useEffect(() => {
-    // Advance steps based on cumulative duration
+  const activeStep = (() => {
+    // Derive the active step from elapsed time to avoid setState in effects
     let cumulative = 0;
     for (let i = 0; i < PIPELINE_STEPS.length; i++) {
       cumulative += PIPELINE_STEPS[i].duration;
       if (elapsed < cumulative) {
-        setActiveStep(i);
-        return;
+        return i;
       }
     }
     // If past all steps, stay on last one
-    setActiveStep(PIPELINE_STEPS.length - 1);
-  }, [elapsed]);
+    return PIPELINE_STEPS.length - 1;
+  })();
 
   // Calculate total progress
   const totalDuration = PIPELINE_STEPS.reduce((sum, s) => sum + s.duration, 0);
@@ -217,8 +215,6 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
 }
 
 export function ProgressCard({ run, onRefresh }: Props) {
-  const isActive = run.status === "queued" || run.status === "processing";
-
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -261,7 +257,7 @@ export function ProgressCard({ run, onRefresh }: Props) {
         </div>
       )}
 
-      {/* Processing state — animated pipeline */}
+      {/* Processing state - animated pipeline */}
       {run.status === "processing" && (
         <ProcessingPipeline startedAt={run.created_at} />
       )}
@@ -302,7 +298,7 @@ export function ProgressCard({ run, onRefresh }: Props) {
               </p>
             </div>
           </div>
-          <p className="text-xs text-zinc-500">Try generating again — each attempt produces a unique result.</p>
+          <p className="text-xs text-zinc-500">Try generating again - each attempt produces a unique result.</p>
         </div>
       )}
     </div>

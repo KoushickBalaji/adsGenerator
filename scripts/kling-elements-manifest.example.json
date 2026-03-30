@@ -1,0 +1,18 @@
+{
+  "prefix": "bluestone",
+  "elements": [
+    {
+      "name": "bluestone-anya",
+      "description": "Brand ambassador element 1",
+      "frontal": "D:/path/to/anya/front.jpg",
+      "refs": ["D:/path/to/anya/ref1.jpg", "D:/path/to/anya/ref2.jpg"]
+    },
+    {
+      "name": "bluestone-muse-02",
+      "description": "Brand ambassador element 2",
+      "frontal": "D:/path/to/muse02/front.jpg",
+      "refs": ["D:/path/to/muse02/ref1.jpg"]
+    }
+  ]
+}
+
