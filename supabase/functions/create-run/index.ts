@@ -20,6 +20,10 @@ serve(async (req) => {
     return new Response("ok", { headers: CORS_HEADERS });
   }
 
+  const supabase = getServiceClient();
+  let insertedRunId: string | null = null;
+  let createdProviderJobId: string | null = null;
+
   try {
     // Non-secret config: hardcode the Kling model(s) for this demo.
     // We'll try the preferred model first, then fall back if Kling rejects it as invalid.
@@ -46,9 +50,32 @@ serve(async (req) => {
       );
     }
 
-    // Step 0: Basic concurrency guard (keep UX simple; no explicit limit in the UI)
+    // Step 0: Cleanup stale active runs so they don't permanently block new generations
+    // (e.g. if a webhook never arrives or a provider request failed after DB insert).
+    const now = Date.now();
+    const queuedCutoffIso = new Date(now - 10 * 60 * 1000).toISOString(); // 10 min
+    const processingCutoffIso = new Date(now - 45 * 60 * 1000).toISOString(); // 45 min
+
+    await supabase
+      .from("video_runs")
+      .update({
+        status: "failed",
+        error_message: "This run timed out. Please try generating again.",
+      })
+      .eq("status", "queued")
+      .lt("created_at", queuedCutoffIso);
+
+    await supabase
+      .from("video_runs")
+      .update({
+        status: "failed",
+        error_message: "This run timed out. Please try generating again.",
+      })
+      .eq("status", "processing")
+      .lt("created_at", processingCutoffIso);
+
+    // Step 1: Basic concurrency guard (keep UX simple; no explicit limit in the UI)
     const MAX_CONCURRENT_RUNS = 3;
-    const supabase = getServiceClient();
     const { count: activeCount, error: countError } = await supabase
       .from("video_runs")
       .select("id", { count: "exact", head: true })
@@ -63,11 +90,11 @@ serve(async (req) => {
       );
     }
 
-    // Step 1: Scrape product data
+    // Step 2: Scrape product data
     const product = await scrapeProduct(url);
-    console.log(`[step 1] Scraped: "${product.product_title}", ${product.input_images.length} images`);
+    console.log(`[step 2] Scraped: "${product.product_title}", ${product.input_images.length} images`);
 
-    // Step 2: Fetch a random brand ambassador element - required
+    // Step 3: Fetch a random brand ambassador element - required
     const element = await getRandomElement({
       namePrefix: BRAND_ELEMENT_NAME_PREFIX,
     });
@@ -82,16 +109,21 @@ serve(async (req) => {
         `Selected element "${element.name}" is not eligible. Expected name to start with "${BRAND_ELEMENT_NAME_PREFIX}".`
       );
     }
-    console.log(`[step 2] Ambassador: ${element.name} (${element.id})`);
+    console.log(`[step 3] Ambassador: ${element.name} (${element.id})`);
 
-    // Step 3: Generate prompt (always includes <<<element_1>>> + <<<image_1>>>...)
-    const { prompt } = await generateKlingPromptWithGemini(
+    // Step 4: Generate prompt (always includes <<<element_1>>> + <<<image_1>>>...)
+    const { prompt, request } = await generateKlingPromptWithGemini(
       product,
       product.input_images.length
     );
-    console.log(`[step 3] Prompt: ${prompt}`);
+    console.log(`[step 4] Prompt: ${prompt}`);
+    console.log(
+      `[step 4] Selected reference angles (first 3): ${(request.productImageUrls || [])
+        .slice(0, 3)
+        .join(", ")}`
+    );
 
-    // Step 4: Insert DB row
+    // Step 5: Insert DB row
     const { data: run, error: dbError } = await supabase
       .from("video_runs")
       .insert({
@@ -99,22 +131,26 @@ serve(async (req) => {
         product_title: product.product_title,
         product_category: product.product_category,
         status: "queued",
-        input_images: product.input_images,
+        // Persist the ordered references used for this run:
+        // - first 3 are used by Kling (video + prompt tokens)
+        // - remaining (if any) are prompt-only context
+        input_images: request.productImageUrls,
         prompt,
       })
       .select()
       .single();
 
     if (dbError) throw dbError;
+    insertedRunId = run.id;
 
-    // Step 5: Call Kling Omni-Video API (O-series, e.g. O3)
+    // Step 6: Call Kling Omni-Video API (O-series, e.g. O3)
     const webhookUrl = Deno.env.get("SUPABASE_URL")
       ? `${Deno.env.get("SUPABASE_URL")}/functions/v1/kling-webhook`
       : undefined;
 
-    const imgs = product.input_images;
+    const imgs = request.productImageUrls;
     console.log(
-      `[step 5] Kling model candidates: ${KLING_MODEL_CANDIDATES.join(", ")}`
+      `[step 6] Kling model candidates: ${KLING_MODEL_CANDIDATES.join(", ")}`
     );
     const imageList = imgs.slice(0, 3).map((imageUrl) => ({
       image_url: imageUrl,
@@ -127,7 +163,7 @@ serve(async (req) => {
 
     for (const modelName of KLING_MODEL_CANDIDATES) {
       try {
-        console.log(`[step 5] Trying Kling model: ${modelName}`);
+        console.log(`[step 6] Trying Kling model: ${modelName}`);
         klingRes = await createOmniVideo({
           model_name: modelName,
           prompt,
@@ -138,7 +174,7 @@ serve(async (req) => {
           mode: "pro",
           callback_url: webhookUrl,
         });
-        console.log(`[step 5] Using Kling model: ${modelName}`);
+        console.log(`[step 6] Using Kling model: ${modelName}`);
         break;
       } catch (err) {
         lastError = err;
@@ -146,7 +182,7 @@ serve(async (req) => {
         // Only fall back when Kling explicitly rejects the model name.
         if (msg.toLowerCase().includes("model_name") && msg.toLowerCase().includes("invalid")) {
           console.warn(
-            `[step 5] Kling rejected model "${modelName}" as invalid; trying next candidate.`
+            `[step 6] Kling rejected model "${modelName}" as invalid; trying next candidate.`
           );
           continue;
         }
@@ -160,9 +196,10 @@ serve(async (req) => {
         : new Error("Kling request failed");
     }
 
-    console.log(`[step 5] Kling task: ${klingRes.data.task_id}`);
+    console.log(`[step 6] Kling task: ${klingRes.data.task_id}`);
+    createdProviderJobId = klingRes.data.task_id;
 
-    // Step 6: Update row with provider job ID
+    // Step 7: Update row with provider job ID
     await supabase
       .from("video_runs")
       .update({
@@ -175,10 +212,25 @@ serve(async (req) => {
   } catch (err) {
     console.error("create-run error:", err);
     const raw = err instanceof Error ? err.message : String(err);
-    return jsonResponse(
-      { error: toFriendlyError(raw) },
-      500
-    );
+    const friendly = toFriendlyError(raw);
+
+    // If we already created a DB row, mark it failed so it doesn't clog the queue.
+    if (insertedRunId) {
+      try {
+        await supabase
+          .from("video_runs")
+          .update({
+            status: "failed",
+            error_message: friendly,
+            ...(createdProviderJobId ? { provider_job_id: createdProviderJobId } : {}),
+          })
+          .eq("id", insertedRunId);
+      } catch (updateErr) {
+        console.warn("[create-run] Failed to mark run as failed:", updateErr);
+      }
+    }
+
+    return jsonResponse({ error: friendly }, 500);
   }
 });
 

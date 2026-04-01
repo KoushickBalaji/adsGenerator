@@ -73,22 +73,23 @@ function getJewellerySpec(
         noun,
         shot1WornText,
         shot2WornText,
-        visibilityAnchor: "ring hand (one finger)",
-        placement: { hand: "right", finger: "ring" },
+        visibilityAnchor: "ring hand (single ring; one hand only)",
+        placement: { hand: "right", finger: "ring", other_hand: "bare" },
         framingHint:
-          "face-centered medium shot; ring hand stays in-frame near desk/body, never reaching toward the lens",
+          "face-centered medium shot; ring hand stays in-frame near desk/body, never reaching toward the lens; other hand stays natural and ring-free",
         exampleActionShot1:
-          "she reviews a slide deck on a laptop and makes a quick note with her ring hand—functional movement, no posing toward camera",
+          "she reviews a slide deck and makes a quick note with her ring hand - practical movement, no posing; the other hand stays relaxed and ring-free",
         exampleActionShot2:
-          "she leads a meeting holding a slim presentation clicker; her ring hand gestures naturally close to her body while she speaks",
+          "she leads a meeting and gestures naturally with her ring hand close to her body while speaking; the other hand remains ring-free",
         visibilityRules: [
-          "show exactly one ring on one finger",
-          "no stacked bands or extra rings",
+          "show exactly one ring total (single hand, single finger only)",
+          "no rings on the other hand or on any other fingers",
+          "no stacked bands, no duplicate rings",
           "no deliberate showcasing (do not hold the ring finger up toward the camera)",
           "keep the ring visible in natural movement; do not hide it behind large props",
         ],
         propObstructionExample:
-          "keep the ring hand in-frame near notebook/keyboard level; avoid mugs/cups fully covering the ring",
+          "keep the ring hand in-frame near notebook/keyboard level; avoid symmetrical two-hand poses; avoid mugs/cups fully covering the ring",
       };
 
     case "necklace":
@@ -205,18 +206,143 @@ const GEMINI_GENERATION_CONFIG = {
   thinkingConfig: { thinkingBudget: 0 },
 } as const;
 
+// For selecting a small subset of "best" reference angles, keep the model more deterministic.
+const GEMINI_IMAGE_SELECTION_CONFIG = {
+  maxOutputTokens: 128,
+  temperature: 0.2,
+  thinkingConfig: { thinkingBudget: 0 },
+  responseMimeType: "application/json",
+} as const;
+
 // Kling Omni-Video prompt limit (server-side validation)
 // Kling returns: "prompt: size must be between 0 and 2500"
 const KLING_PROMPT_MAX_CHARS = 2500;
 // Keep a buffer so we don't hover around the edge.
 const KLING_PROMPT_TARGET_MAX_CHARS = 2300;
 
+// Keep candidate image count small to avoid large request payloads when we pass images as inline_data.
+const MAX_PRODUCT_IMAGE_CANDIDATES = 12;
+
+function parseSelectedIndices(
+  text: string,
+  maxCandidateCount: number
+): number[] | null {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return null;
+
+  function normalize(values: unknown): number[] | null {
+    const rawArr = Array.isArray(values)
+      ? values
+      : values && typeof values === "object"
+        ? (values as Record<string, unknown>).selected
+        : null;
+    if (!Array.isArray(rawArr)) return null;
+
+    const out: number[] = [];
+    const seen = new Set<number>();
+    for (const v of rawArr) {
+      const n = typeof v === "number" ? v : Number(String(v).trim());
+      if (!Number.isFinite(n)) continue;
+      const idx = Math.trunc(n);
+      if (idx < 1 || idx > maxCandidateCount) continue;
+      if (seen.has(idx)) continue;
+      seen.add(idx);
+      out.push(idx);
+      if (out.length >= 3) break;
+    }
+    return out.length === 3 ? out.map((n) => n - 1) : null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    const normalized = normalize(parsed);
+    if (normalized) return normalized;
+  } catch {
+    // fall through
+  }
+
+  // Fallback: extract integers from free-form text like "Selected: 2, 5, 1"
+  const matches = trimmed.match(/\d+/g) || [];
+  const nums: number[] = [];
+  const seen = new Set<number>();
+  for (const m of matches) {
+    const n = Number(m);
+    if (!Number.isFinite(n)) continue;
+    const idx = Math.trunc(n);
+    if (idx < 1 || idx > maxCandidateCount) continue;
+    if (seen.has(idx)) continue;
+    seen.add(idx);
+    nums.push(idx);
+    if (nums.length >= 3) break;
+  }
+  return nums.length === 3 ? nums.map((n) => n - 1) : null;
+}
+
+async function selectBestThreeImagesWithGemini(opts: {
+  apiKey: string;
+  model: string;
+  candidates: Array<{
+    url: string;
+    part: { inline_data: { mime_type: string; data: string } };
+  }>;
+}): Promise<{ selectedIndexes: number[]; usageMetadata?: unknown } | null> {
+  const { apiKey, model, candidates } = opts;
+  if (candidates.length <= 3) return null;
+
+  const systemPrompt =
+    "You are curating reference images for a jewellery video model. " +
+    "You will be shown multiple candidate images labeled Candidate 1..N. " +
+    "Pick the BEST 3 candidates to represent the product design.\n\n" +
+    "CRITERIA (most important first):\n" +
+    "- Prefer clean product-only renders (single item on plain background).\n" +
+    "- Avoid video thumbnails/posters (play icon, 'VIDEO' label, poster frames).\n" +
+    "- Avoid worn/lifestyle shots (hands/models) unless there are no product-only renders.\n" +
+    "- Avoid collages or images with multiple jewellery items.\n" +
+    "- Choose 3 distinct angles/views.\n\n" +
+    "OUTPUT:\n" +
+    'Return ONLY valid JSON: {"selected":[i,j,k]} where i/j/k are 1-based candidate numbers.';
+
+  const userParts: Array<Record<string, unknown>> = [
+    { text: `Select 3 best candidates out of ${candidates.length}.` },
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    userParts.push({ text: `Candidate ${i + 1}:` });
+    userParts.push(candidates[i].part as unknown as Record<string, unknown>);
+  }
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: userParts }],
+        generationConfig: { ...GEMINI_IMAGE_SELECTION_CONFIG },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const selectedIndexes = parseSelectedIndices(String(text ?? ""), candidates.length);
+  if (!selectedIndexes) return null;
+  return { selectedIndexes, usageMetadata: data?.usageMetadata };
+}
+
 export function buildGeminiKlingPromptRequest(
   product: ProductForPrompt,
   imageCount: number
 ): GeminiKlingPromptRequest {
   const productImageUrls = Array.isArray(product.input_images)
-    ? product.input_images.filter((u) => typeof u === "string")
+    ? product.input_images
+        .filter((u) => typeof u === "string")
+        .slice(0, MAX_PRODUCT_IMAGE_CANDIDATES)
     : [];
 
   const imageRefs = Array.from(
@@ -239,9 +365,9 @@ export function buildGeminiKlingPromptRequest(
       mood: "calm, focused, quietly confident",
     },
     wardrobe: {
-      top: "fitted ivory knit top",
+      top: "silk button-down blouse (fully opaque, modest neckline)",
       bottom: "tailored charcoal trousers",
-      layer: "lightweight blazer",
+      layer: "structured blazer",
       colors: ["ivory", "charcoal"],
     },
     jewellery: {
@@ -303,9 +429,11 @@ ${elementTokenLine}
 MANDATORY:
 ${ambassadorRuleLine}
 - You MUST use EVERY available image token: ${imageRefStr}. Each token is a different view of the SAME piece (different angles/poses) - use them as continuity anchors. NEVER imply the jewellery changes across tokens or between shots.
+- You may receive additional reference photos beyond the ${imageRefStr} tokens. Treat them as extra views of the SAME piece; do not mention or imply differences.
 - Avoid wording that makes the tokens sound like different jewellery pieces. DO NOT write phrases like "from <<<image_1>>> and <<<image_2>>>" or "details matching <<<image_3>>>".
 - BEST PRACTICE: define the jewellery ONCE using ALL image tokens together, e.g. "${jewellery.shot1WornText}". After that, refer only to "${jewellery.shot2WornText}" (no new ref tokens in later mentions).
 - The ambassador wears ONLY the referenced jewellery piece. Show exactly ONE referenced piece (count = 1) and avoid any other jewellery (no extra rings, necklaces, earrings, bracelets, watches).
+- If the jewellery is a ring: show exactly ONE ring total. No rings on the other hand or any other fingers.
 - Visibility anchor for this category: keep ${jewellery.visibilityAnchor} visible as a secondary detail in BOTH shots (never posed or pushed toward the lens).
 - NEVER use the product's name or brand name. Avoid other proper nouns (people/places). Refer to the jewellery only through the image tokens or generic descriptions like "the ring", "the necklace", etc.
 
@@ -317,16 +445,18 @@ CHARACTER & STORY (MODERN, SUCCESSFUL WOMAN):
 - Use subtle success cues (laptop, notebook, presentation clicker, glass-walled meeting room, office lobby) without turning it into a corporate stereotype.
 - The jewellery must feel like part of her, not the point: keep it present/visible, but NEVER posed or deliberately shown to the camera.
 
-WARDROBE (MODERN CASUAL):
-- Describe the ambassador's modern casual outfit in Shot 1 (top + bottom + 1-2 color cues). Keep it premium, comfortable, and everyday.
+WARDROBE (BUSINESS PROFESSIONAL):
+- Dress code is fully corporate and boardroom-appropriate.
+- Describe the ambassador's business-professional outfit in Shot 1 (top + bottom + optional layer + 1-2 color cues).
 - Keep the SAME outfit across BOTH shots (no wardrobe change).
 - Aim for variety across generations: choose one of these wardrobe directions each time:
-  - linen shirt + high-waisted jeans
-  - knit top + midi skirt
-  - casual blazer + fitted tee + trousers
-  - simple midi dress + light cardigan
-  - cotton poplin blouse + wide-leg pants
+  - tailored blazer + silk button-down blouse + trousers
+  - monochrome pantsuit + tucked-in blouse
+  - structured sheath midi dress + blazer
+  - high-neck fine-knit top + blazer + pencil skirt
+  - crisp cotton shirt + wide-leg trousers
 - Avoid traditional/ceremonial attire (saree, lehenga, heavy wedding wear) and avoid adding accessories/jewellery beyond the referenced piece.
+- STRICTLY AVOID: corsets, bralettes, lingerie, crop tops, visible bra, deep cleavage, sheer lace, strapless/off-shoulder looks.
 
 KLING MULTI-SHOT STORYBOARD (JSON STRUCTURE):
 - Write a TWO-SHOT storyboard for ~10s total, 1:1 (square).
@@ -376,8 +506,8 @@ The ambassador is <<<element_1>>>. The product images are: ${imageRefStr}.
 You MUST use every single one of these tokens in your prompt.
 In Shot 1 JSON, set jewellery.worn_text to exactly: "${jewellery.shot1WornText}".
 In Shot 2 JSON, set jewellery.worn_text to exactly: "${jewellery.shot2WornText}" (do not include any ${imageRefStr} tokens in Shot 2).
-Story: portray <<<element_1>>> as a modern, successful woman in her day-to-day life. Include at least one high-stakes-but-real moment (e.g., prepping/leading a presentation, important meeting, commute to a big pitch). The jewellery must be incidental—never deliberately shown to the camera.
-Wardrobe: modern casual. Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2.
+Story: portray <<<element_1>>> as a modern, successful woman in her day-to-day life. Include at least one high-stakes-but-real moment (e.g., prepping/leading a presentation, important meeting, commute to a big pitch). The jewellery must be incidental - never deliberately shown to the camera.
+Wardrobe: business professional (corporate/boardroom). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).
 
 Output a TWO-SHOT storyboard using these headings, with ONE JSON object after each heading:
 Shot 1 (0-5s): ...
@@ -445,7 +575,85 @@ export async function generateKlingPromptWithGemini(
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
-  const request = buildGeminiKlingPromptRequest(product, imageCount);
+  const candidateUrls = Array.isArray(product.input_images)
+    ? product.input_images
+        .filter((u) => typeof u === "string")
+        .slice(0, MAX_PRODUCT_IMAGE_CANDIDATES)
+    : [];
+
+  // Fetch/encode candidate images once so we can:
+  // 1) optionally ask Gemini to pick the best 3 reference angles
+  // 2) reuse the same inline_data parts for the prompt-generation call (and retry)
+  const fetchedCandidates = await Promise.all(
+    candidateUrls.map(async (url, originalIndex) => {
+      const part = await imageUrlToGeminiInlineDataPart(url);
+      return { url, originalIndex, part };
+    })
+  );
+  const partByUrl = new Map(
+    fetchedCandidates.map((c) => [c.url, c.part] as const)
+  );
+
+  const loadedCandidates = fetchedCandidates
+    .filter(
+      (c): c is {
+        url: string;
+        originalIndex: number;
+        part: { inline_data: { mime_type: string; data: string } };
+      } => Boolean(c.part)
+    )
+    .sort((a, b) => a.originalIndex - b.originalIndex);
+
+  let selectedUrls: string[] = candidateUrls.slice(0, 3);
+  let selectionUsageMetadata: unknown | undefined;
+
+  if (candidateUrls.length > 3 && loadedCandidates.length >= 3) {
+    const selectable = loadedCandidates;
+    try {
+      if (selectable.length > 3) {
+        const selection = await selectBestThreeImagesWithGemini({
+          apiKey,
+          model: GEMINI_MODEL,
+          candidates: selectable,
+        });
+        if (selection) {
+          selectionUsageMetadata = selection.usageMetadata;
+          selectedUrls = selection.selectedIndexes.map((i) => selectable[i].url);
+        } else {
+          selectedUrls = selectable.slice(0, 3).map((c) => c.url);
+        }
+      } else {
+        selectedUrls = selectable.slice(0, 3).map((c) => c.url);
+      }
+    } catch (err) {
+      console.warn(
+        "[geminiPrompt] Image selection failed; falling back to first 3 candidates.",
+        err
+      );
+      selectedUrls = candidateUrls.slice(0, 3);
+    }
+  } else if (loadedCandidates.length >= 3) {
+    // If we have >=3 loadable candidates, prefer those for the first 3 slots.
+    selectedUrls = loadedCandidates.slice(0, 3).map((c) => c.url);
+  }
+
+  const selectedSet = new Set(selectedUrls);
+  const orderedUrls = [
+    ...selectedUrls,
+    ...candidateUrls.filter((u) => !selectedSet.has(u)),
+  ];
+
+  // Keep the original product object immutable; create a view with ordered images.
+  // First 3 URLs = Kling + prompt reference tokens, remainder = prompt-only context.
+  const orderedProduct: ProductForPrompt = {
+    ...product,
+    input_images: orderedUrls,
+  };
+
+  const request = buildGeminiKlingPromptRequest(
+    orderedProduct,
+    orderedUrls.length || imageCount
+  );
 
   // Build product image parts once so we can retry without refetching images.
   const referenceParts: Array<Record<string, unknown>> = [];
@@ -460,7 +668,7 @@ export async function generateKlingPromptWithGemini(
     for (let i = 0; i < request.productImageUrls.length; i++) {
       const url = request.productImageUrls[i];
       const label = request.imageRefs[i] ?? `additional_image_${i + 1}`;
-      const part = await imageUrlToGeminiInlineDataPart(url);
+      const part = partByUrl.get(url) ?? (await imageUrlToGeminiInlineDataPart(url));
       if (part) {
         referenceParts.push({ text: `Reference photo for ${label}:` });
         referenceParts.push(part as unknown as Record<string, unknown>);
@@ -482,6 +690,9 @@ export async function generateKlingPromptWithGemini(
   }
 
   request.geminiImageContext = geminiImageContext;
+  // Non-breaking: attach selection usage metadata for debugging (test-prompt returns this object)
+  (request as unknown as Record<string, unknown>).image_selection_usage_metadata =
+    selectionUsageMetadata;
 
   async function callGeminiOnce(
     userMessage: string,

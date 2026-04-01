@@ -17,15 +17,16 @@ const STATUS_COLORS: Record<VideoRun["status"], string> = {
 
 // Pipeline steps shown during processing
 const PIPELINE_STEPS = [
-  { label: "Getting to know the piece", icon: "search", duration: 4000 },
-  { label: "Noticing the little details", icon: "gem", duration: 5000 },
-  { label: "Casting the muse", icon: "user", duration: 4000 },
-  { label: "Shaping the storyline", icon: "sparkle", duration: 5000 },
-  { label: "Setting the scene", icon: "layout", duration: 6000 },
-  { label: "Capturing the moment", icon: "film", duration: 15000 },
-  { label: "Bringing it to life", icon: "clapperboard", duration: 20000 },
-  { label: "Setting the mood lighting", icon: "sun", duration: 10000 },
-  { label: "Adding final touches", icon: "sparkles", duration: 10000 },
+  // Keep steps slow enough to feel "creative", not "stuck": ~30-60s per stage
+  { label: "Getting to know the piece", icon: "search", duration: 35000 },
+  { label: "Noticing the little details", icon: "gem", duration: 40000 },
+  { label: "Casting the muse", icon: "user", duration: 35000 },
+  { label: "Shaping the storyline", icon: "sparkle", duration: 40000 },
+  { label: "Setting the scene", icon: "layout", duration: 45000 },
+  { label: "Capturing the moment", icon: "film", duration: 60000 },
+  { label: "Bringing it to life", icon: "clapperboard", duration: 60000 },
+  { label: "Setting the mood lighting", icon: "sun", duration: 45000 },
+  { label: "Adding final touches", icon: "sparkles", duration: 45000 },
 ];
 
 function StepIcon({ icon, className }: { icon: string; className?: string }) {
@@ -98,7 +99,7 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
     const start = new Date(startedAt).getTime();
     const interval = setInterval(() => {
       setElapsed(Date.now() - start);
-    }, 100);
+    }, 500);
     return () => clearInterval(interval);
   }, [startedAt]);
 
@@ -271,19 +272,11 @@ export function ProgressCard({ run, onRefresh }: Props) {
           <video
             src={run.output_video_url}
             controls
+            controlsList="nodownload noremoteplayback"
+            disablePictureInPicture
             className="w-full rounded-lg"
             poster={run.thumbnail_url || undefined}
           />
-          <a
-            href={run.output_video_url}
-            download
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download MP4
-          </a>
         </div>
       )}
 

@@ -605,13 +605,18 @@ serve(async (req) => {
         title: product.product_title,
         category: product.product_category,
         image_count: product.input_images.length,
+        // Raw scraped candidates (pre-selection)
         images: product.input_images,
         ...(debugMedia && product.scrape_debug
           ? { scrape_debug: product.scrape_debug }
           : {}),
       },
       references: {
-        kling_image_list: product.input_images.slice(0, 3),
+        // Ordered references used by the prompt generator:
+        // - first 3 are used by Kling (video + prompt tokens)
+        // - remaining (if any) are prompt-only context
+        ordered_images: request.productImageUrls,
+        kling_image_list: request.productImageUrls.slice(0, 3),
         gemini_image_context: request.geminiImageContext,
       },
       gemini: {

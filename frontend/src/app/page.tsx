@@ -243,9 +243,9 @@ export default function Home() {
           )}
         </section>
 
-        <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+        <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
           {/* Active run / main area */}
-          <section>
+          <section className="order-1 lg:order-2">
             {activeRun ? (
               <ProgressCard run={activeRun} onRefresh={handleRefresh} />
             ) : (
@@ -258,7 +258,7 @@ export default function Home() {
           </section>
 
           {/* History sidebar */}
-          <aside>
+          <aside className="order-2 lg:order-1">
             <h2 className="mb-3 text-sm font-medium text-zinc-400">
               History
             </h2>

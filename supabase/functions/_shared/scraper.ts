@@ -7,15 +7,20 @@ export type ProductData = {
   product_title: string;
   product_description: string;
   product_category: string;
-  input_images: string[]; // up to 4 high-res product images
+  // Reference product images (highest quality available). We may keep more than 3 for
+  // prompt-only context, but Kling uses only the first 3.
+  input_images: string[]; // up to 12 reference images
   scrape_debug?: ProductScrapeDebug;
 };
 
 export type GalleryMediaDebug = {
   product_code: string | null;
+  has_video_items: boolean;
   image_urls_unique: string[];
   image_urls_highres_unique: string[];
   video_urls_unique: string[];
+  excluded_video_thumbnails: string[];
+  deprioritized_lifestyle_images: string[];
   selected_input_images: string[];
   selected_for_kling: string[];
   selected_for_gemini: string[];
@@ -37,7 +42,9 @@ const BROWSER_HEADERS: Record<string, string> = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-const MAX_IMAGES = 4;
+// Keep this fairly small: these images are stored on the run row (shown in the UI),
+// and can also be sent to Gemini as multimodal reference context.
+const MAX_REFERENCE_IMAGES = 12;
 
 /**
  * Extract the design ID from a BlueStone product URL.
@@ -81,6 +88,19 @@ function imagePathKey(url: string): string {
   return match ? match[1] : url;
 }
 
+function extractDesignKeyFromCdnUrl(url: string): string | null {
+  // Prefer a design-specific key (unique per product design) rather than a coarse "BS-R28" prefix.
+  // Example:
+  //   giproduct/BS-R28_YAA18CITRDIG6XXXX_ABCD00-PICS-00001-1024-14128.png
+  //   -> BS-R28_YAA18CITRDIG6XXXX_ABCD00
+  const byPics = url.match(/giproduct\/([^/]+?)-(?:BP-)?PICS-/i);
+  if (byPics) return byPics[1];
+
+  // Fallback: first token before underscore (less specific, but better than nothing).
+  const byUnderscore = url.match(/giproduct\/([\w-]+?)_/i);
+  return byUnderscore ? byUnderscore[1] : null;
+}
+
 export async function scrapeProduct(
   url: string,
   opts: { debug?: boolean } = {}
@@ -97,7 +117,17 @@ export async function scrapeProduct(
     designId ? fetchMetadataFromApi(designId, cleanUrlStr) : Promise.resolve(null),
     fetchGalleryMediaFromHtml(cleanUrlStr),
   ]);
-  const htmlImages = htmlGallery.images;
+  let htmlImages = htmlGallery.images;
+  // Extra guardrail: if the internal API returned an image URL, use its design key to
+  // post-filter HTML gallery candidates. This helps avoid edge cases where the HTML
+  // contains other products (recommended tiles) and OG tags are missing/incorrect.
+  const apiDesignKey = apiData?.fallbackImages?.[0]
+    ? extractDesignKeyFromCdnUrl(apiData.fallbackImages[0])
+    : null;
+  if (apiDesignKey && htmlImages.length > 0) {
+    const filtered = htmlImages.filter((u) => imagePathKey(u).includes(apiDesignKey));
+    if (filtered.length > 0) htmlImages = filtered;
+  }
 
   // Prefer API metadata, fall back to HTML scraping for everything
   if (apiData) {
@@ -107,7 +137,7 @@ export async function scrapeProduct(
       product_title: apiData.name,
       product_description: `${apiData.name} - Premium ${apiData.category} from BlueStone`,
       product_category: apiData.category,
-      input_images: images.slice(0, MAX_IMAGES),
+      input_images: images.slice(0, MAX_REFERENCE_IMAGES),
       ...(opts.debug
         ? {
             scrape_debug: {
@@ -193,7 +223,7 @@ async function fetchMetadataFromApi(
           fallbackImages.push(toHighRes(v.imageUrl));
         }
       }
-      if (fallbackImages.length >= MAX_IMAGES) break;
+      if (fallbackImages.length >= MAX_REFERENCE_IMAGES) break;
     }
 
     return { name, category, fallbackImages };
@@ -217,11 +247,21 @@ async function fetchGalleryMediaFromHtml(url: string): Promise<{
     if (!res.ok) return { images: [], debug: null };
 
     const html = await res.text();
+    const hasVideoItems =
+      html.toLowerCase().includes("video-thumb") ||
+      html.toLowerCase().includes("video thumb");
 
-    // Extract the product code from the page to filter product-specific media
-    // e.g. "BS-R28" from the image paths
-    const productCodeMatch = html.match(/giproduct\/([\w-]+?)_/);
-    const productCode = productCodeMatch ? productCodeMatch[1] : null;
+    // Extract the product code from the page to filter product-specific media.
+    // IMPORTANT: Don't use the first `giproduct/...` match in the HTML because pages can
+    // include "recommended" product tiles before/around the main gallery.
+    // Prefer the main product's OG image (almost always present) and fall back to first match.
+    const ogImageMatch = html.match(
+      /property=["']og:image["'][^>]*content=["']([^"']+)["']/i
+    );
+    const ogImageUrl = ogImageMatch ? ogImageMatch[1] : null;
+    const designKey =
+      (ogImageUrl ? extractDesignKeyFromCdnUrl(ogImageUrl) : null) ??
+      extractDesignKeyFromCdnUrl(html);
 
     // Extract any video URLs (useful for debugging; not currently passed to Kling)
     const videoRegex = /https:\/\/[^"'\\s]+?\.(?:mp4|webm|m3u8)(?:\?[^"'\\s]+)?/g;
@@ -237,14 +277,17 @@ async function fetchGalleryMediaFromHtml(url: string): Promise<{
       if (videoUrlsUnique.length >= 50) break;
     }
 
-    if (!productCode) {
+    if (!designKey) {
       return {
         images: [],
         debug: {
           product_code: null,
+          has_video_items: hasVideoItems,
           image_urls_unique: [],
           image_urls_highres_unique: [],
           video_urls_unique: videoUrlsUnique,
+          excluded_video_thumbnails: [],
+          deprioritized_lifestyle_images: [],
           selected_input_images: [],
           selected_for_kling: [],
           selected_for_gemini: [],
@@ -252,9 +295,10 @@ async function fetchGalleryMediaFromHtml(url: string): Promise<{
       };
     }
 
-    // Find all product images matching this product code
+    // Find all product images matching this design key (avoid "you may also like" tiles)
+    const escapedDesignKey = designKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const imageRegex = new RegExp(
-      `https://kinclimg\\d+\\.bluestone\\.com/[^"']+${productCode}[^"']+\\.(png|jpg|jpeg)`,
+      `https://kinclimg\\d+\\.bluestone\\.com/[^"']+${escapedDesignKey}[^"']+\\.(png|jpg|jpeg)`,
       "g"
     );
     const allMatches = html.match(imageRegex) || [];
@@ -264,6 +308,23 @@ async function fetchGalleryMediaFromHtml(url: string): Promise<{
     const imageUrlsUnique: string[] = [];
     const seenHighRes = new Set<string>();
     const imageUrlsHighResUnique: string[] = [];
+
+    function isLikelyVideoThumbnail(imageUrl: string): boolean {
+      const lower = imageUrl.toLowerCase();
+      // Known site-level placeholder for video items
+      if (lower.includes("video-thumb")) return true;
+      // Common poster/thumbnail naming patterns
+      if (lower.includes("video_poster") || lower.includes("video-poster")) return true;
+      if (/(?:^|[-_])(vid|video|vdo|poster)(?:[-_]|\\.)/.test(lower)) return true;
+      return false;
+    }
+
+    function isLifestyleOrBeautyShot(imageUrl: string): boolean {
+      // Bluestone convention: "-BP-" / "BP-PICS" are typically "beauty" shots (worn on hand/model),
+      // which can unintentionally introduce extra jewellery (e.g., other rings/bracelets) into references.
+      const key = imagePathKey(imageUrl).toLowerCase();
+      return key.includes("-bp-") || key.includes("bp-pics");
+    }
 
     for (const imgUrl of allMatches) {
       const normalized = toHighRes(imgUrl);
@@ -277,19 +338,40 @@ async function fetchGalleryMediaFromHtml(url: string): Promise<{
       // For selection, keep only explicit high-res versions and skip video posters
       if (!imgUrl.includes("w_1024")) continue;
       if (imgUrl.includes("POSTER")) continue;
+      if (isLikelyVideoThumbnail(normalized)) continue;
       if (seenHighRes.has(key)) continue;
       seenHighRes.add(key);
       imageUrlsHighResUnique.push(normalized);
     }
 
-    const selected = imageUrlsHighResUnique.slice(0, MAX_IMAGES);
+    // Order selection: prefer clean product renders first so Kling doesn't pick up extra jewellery
+    // from lifestyle/beauty references (and to avoid video thumbnails/posters).
+    const lifestyle = imageUrlsHighResUnique.filter((u) => isLifestyleOrBeautyShot(u));
+    const productOnly = imageUrlsHighResUnique.filter((u) => !isLifestyleOrBeautyShot(u));
+
+    // Prefer clean product renders only (especially for rings) to avoid reference pollution from
+    // lifestyle shots (which can include other jewellery like extra rings/bracelets).
+    const selected =
+      productOnly.length > 0
+        ? productOnly.slice(0, MAX_REFERENCE_IMAGES)
+        : lifestyle.slice(0, MAX_REFERENCE_IMAGES);
+    if (productOnly.length === 0 && lifestyle.length > 0) {
+      console.warn(
+        `[scrapeProduct] Only lifestyle/beauty images found for ${designKey}; using them as fallback.`
+      );
+    }
+
+    const excludedVideoThumbs = imageUrlsUnique.filter((u) => isLikelyVideoThumbnail(u));
     return {
-      images: selected,
-      debug: {
-        product_code: productCode,
+        images: selected,
+        debug: {
+        product_code: designKey,
+        has_video_items: hasVideoItems,
         image_urls_unique: imageUrlsUnique,
         image_urls_highres_unique: imageUrlsHighResUnique,
         video_urls_unique: videoUrlsUnique,
+        excluded_video_thumbnails: excludedVideoThumbs,
+        deprioritized_lifestyle_images: lifestyle,
         selected_input_images: selected,
         selected_for_kling: selected.slice(0, 3),
         selected_for_gemini: selected,
@@ -331,7 +413,7 @@ async function scrapeFromHtml(url: string, preloadedImages: string[]): Promise<P
           product_title: data.name,
           product_description: data.description || "",
           product_category: inferCategory(data.name, data.category || ""),
-          input_images: images.slice(0, MAX_IMAGES),
+          input_images: images.slice(0, MAX_REFERENCE_IMAGES),
         };
       }
     } catch { /* skip */ }
@@ -348,7 +430,7 @@ async function scrapeFromHtml(url: string, preloadedImages: string[]): Promise<P
       product_title: ogTitle,
       product_description: ogDesc || "",
       product_category: inferCategory(ogTitle, ""),
-      input_images: images.slice(0, MAX_IMAGES),
+      input_images: images.slice(0, MAX_REFERENCE_IMAGES),
     };
   }
 
@@ -358,7 +440,7 @@ async function scrapeFromHtml(url: string, preloadedImages: string[]): Promise<P
       product_title: "BlueStone Product",
       product_description: "",
       product_category: extractCategoryFromUrl(url),
-      input_images: preloadedImages.slice(0, MAX_IMAGES),
+      input_images: preloadedImages.slice(0, MAX_REFERENCE_IMAGES),
     };
   }
 
