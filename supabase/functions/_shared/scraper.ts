@@ -8,6 +8,25 @@ export type ProductData = {
   product_description: string;
   product_category: string;
   input_images: string[]; // up to 4 high-res product images
+  scrape_debug?: ProductScrapeDebug;
+};
+
+export type GalleryMediaDebug = {
+  product_code: string | null;
+  image_urls_unique: string[];
+  image_urls_highres_unique: string[];
+  video_urls_unique: string[];
+  selected_input_images: string[];
+  selected_for_kling: string[];
+  selected_for_gemini: string[];
+};
+
+export type ProductScrapeDebug = {
+  clean_url: string;
+  design_id: string | null;
+  api_used: boolean;
+  api_fallback_images: string[];
+  html_gallery: GalleryMediaDebug | null;
 };
 
 const BROWSER_HEADERS: Record<string, string> = {
@@ -62,7 +81,10 @@ function imagePathKey(url: string): string {
   return match ? match[1] : url;
 }
 
-export async function scrapeProduct(url: string): Promise<ProductData> {
+export async function scrapeProduct(
+  url: string,
+  opts: { debug?: boolean } = {}
+): Promise<ProductData> {
   const cleanUrl = new URL(url);
   cleanUrl.search = "";
   const cleanUrlStr = cleanUrl.toString();
@@ -71,10 +93,11 @@ export async function scrapeProduct(url: string): Promise<ProductData> {
   // Run both strategies in parallel:
   // 1. API for metadata (title, category)
   // 2. HTML for gallery images (multiple angles)
-  const [apiData, htmlImages] = await Promise.all([
+  const [apiData, htmlGallery] = await Promise.all([
     designId ? fetchMetadataFromApi(designId, cleanUrlStr) : Promise.resolve(null),
-    fetchGalleryImagesFromHtml(cleanUrlStr),
+    fetchGalleryMediaFromHtml(cleanUrlStr),
   ]);
+  const htmlImages = htmlGallery.images;
 
   // Prefer API metadata, fall back to HTML scraping for everything
   if (apiData) {
@@ -85,11 +108,36 @@ export async function scrapeProduct(url: string): Promise<ProductData> {
       product_description: `${apiData.name} - Premium ${apiData.category} from BlueStone`,
       product_category: apiData.category,
       input_images: images.slice(0, MAX_IMAGES),
+      ...(opts.debug
+        ? {
+            scrape_debug: {
+              clean_url: cleanUrlStr,
+              design_id: designId,
+              api_used: true,
+              api_fallback_images: apiData.fallbackImages,
+              html_gallery: htmlGallery.debug,
+            } satisfies ProductScrapeDebug,
+          }
+        : {}),
     };
   }
 
   // Full HTML fallback
-  return scrapeFromHtml(cleanUrlStr, htmlImages);
+  const fallback = await scrapeFromHtml(cleanUrlStr, htmlImages);
+  return {
+    ...fallback,
+    ...(opts.debug
+      ? {
+          scrape_debug: {
+            clean_url: cleanUrlStr,
+            design_id: designId,
+            api_used: false,
+            api_fallback_images: [],
+            html_gallery: htmlGallery.debug,
+          } satisfies ProductScrapeDebug,
+        }
+      : {}),
+  };
 }
 
 // ─── Strategy 1: API for metadata ───
@@ -156,52 +204,99 @@ async function fetchMetadataFromApi(
 
 // ─── Strategy 2: HTML gallery images ───
 
-async function fetchGalleryImagesFromHtml(url: string): Promise<string[]> {
+async function fetchGalleryMediaFromHtml(url: string): Promise<{
+  images: string[];
+  debug: GalleryMediaDebug | null;
+}> {
   try {
     const res = await fetch(url, {
       headers: BROWSER_HEADERS,
       redirect: "follow",
     });
 
-    if (!res.ok) return [];
+    if (!res.ok) return { images: [], debug: null };
 
     const html = await res.text();
 
-    // Extract the product code from the URL to filter product-specific images
+    // Extract the product code from the page to filter product-specific media
     // e.g. "BS-R28" from the image paths
     const productCodeMatch = html.match(/giproduct\/([\w-]+?)_/);
     const productCode = productCodeMatch ? productCodeMatch[1] : null;
 
-    if (!productCode) return [];
+    // Extract any video URLs (useful for debugging; not currently passed to Kling)
+    const videoRegex = /https:\/\/[^"'\\s]+?\.(?:mp4|webm|m3u8)(?:\?[^"'\\s]+)?/g;
+    const videoMatches = html.match(videoRegex) || [];
+    const videoUrlsUnique: string[] = [];
+    const seenVideo = new Set<string>();
+    for (const v of videoMatches) {
+      const trimmed = v.trim();
+      if (!/^https?:\/\//i.test(trimmed)) continue;
+      if (seenVideo.has(trimmed)) continue;
+      seenVideo.add(trimmed);
+      videoUrlsUnique.push(trimmed);
+      if (videoUrlsUnique.length >= 50) break;
+    }
 
-    // Find all high-res (w_1024) product images matching this product code
+    if (!productCode) {
+      return {
+        images: [],
+        debug: {
+          product_code: null,
+          image_urls_unique: [],
+          image_urls_highres_unique: [],
+          video_urls_unique: videoUrlsUnique,
+          selected_input_images: [],
+          selected_for_kling: [],
+          selected_for_gemini: [],
+        },
+      };
+    }
+
+    // Find all product images matching this product code
     const imageRegex = new RegExp(
       `https://kinclimg\\d+\\.bluestone\\.com/[^"']+${productCode}[^"']+\\.(png|jpg|jpeg)`,
       "g"
     );
     const allMatches = html.match(imageRegex) || [];
 
-    // Deduplicate by image path, keep only w_1024 versions, exclude posters/videos
-    const seen = new Set<string>();
-    const images: string[] = [];
+    // Deduplicate by image path, keep only w_1024 versions for selection, exclude posters/videos
+    const seenAll = new Set<string>();
+    const imageUrlsUnique: string[] = [];
+    const seenHighRes = new Set<string>();
+    const imageUrlsHighResUnique: string[] = [];
 
     for (const imgUrl of allMatches) {
-      // Only high-res versions
-      if (!imgUrl.includes("w_1024")) continue;
-      // Skip video posters
-      if (imgUrl.includes("POSTER")) continue;
+      const normalized = toHighRes(imgUrl);
+      const key = imagePathKey(normalized);
 
-      const key = imagePathKey(imgUrl);
-      if (!seen.has(key)) {
-        seen.add(key);
-        images.push(toHighRes(imgUrl));
+      if (!seenAll.has(key)) {
+        seenAll.add(key);
+        imageUrlsUnique.push(normalized);
       }
-      if (images.length >= MAX_IMAGES) break;
+
+      // For selection, keep only explicit high-res versions and skip video posters
+      if (!imgUrl.includes("w_1024")) continue;
+      if (imgUrl.includes("POSTER")) continue;
+      if (seenHighRes.has(key)) continue;
+      seenHighRes.add(key);
+      imageUrlsHighResUnique.push(normalized);
     }
 
-    return images;
+    const selected = imageUrlsHighResUnique.slice(0, MAX_IMAGES);
+    return {
+      images: selected,
+      debug: {
+        product_code: productCode,
+        image_urls_unique: imageUrlsUnique,
+        image_urls_highres_unique: imageUrlsHighResUnique,
+        video_urls_unique: videoUrlsUnique,
+        selected_input_images: selected,
+        selected_for_kling: selected.slice(0, 3),
+        selected_for_gemini: selected,
+      },
+    };
   } catch {
-    return [];
+    return { images: [], debug: null };
   }
 }
 

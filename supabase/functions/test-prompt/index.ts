@@ -579,8 +579,11 @@ serve(async (req) => {
       return json({ error: "Only BlueStone URLs are supported" }, 400);
     }
 
-    // Scrape product (same as production)
-    const product = await scrapeProduct(url);
+    // Scrape product (same as production). Optional debug can include full media candidates.
+    const debugMedia =
+      reqUrl.searchParams.get("debug") === "true" ||
+      reqUrl.searchParams.get("debug_media") === "true";
+    const product = await scrapeProduct(url, { debug: debugMedia });
 
     // Generate Gemini prompt using the exact same logic as create-run
     const { prompt, request, usageMetadata } = await generateKlingPromptWithGemini(
@@ -603,6 +606,13 @@ serve(async (req) => {
         category: product.product_category,
         image_count: product.input_images.length,
         images: product.input_images,
+        ...(debugMedia && product.scrape_debug
+          ? { scrape_debug: product.scrape_debug }
+          : {}),
+      },
+      references: {
+        kling_image_list: product.input_images.slice(0, 3),
+        gemini_image_context: request.geminiImageContext,
       },
       gemini: {
         model: request.model,

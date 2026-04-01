@@ -215,6 +215,9 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
 }
 
 export function ProgressCard({ run, onRefresh }: Props) {
+  const klingRefImages = (run.input_images ?? []).slice(0, 3);
+  const geminiRefImages = run.input_images ?? [];
+
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -300,6 +303,64 @@ export function ProgressCard({ run, onRefresh }: Props) {
           </div>
           <p className="text-xs text-zinc-500">Try generating again - each attempt produces a unique result.</p>
         </div>
+      )}
+
+      {/* Reference angles used for this run */}
+      {geminiRefImages.length > 0 && (
+        <details className="mt-6 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
+          <summary className="cursor-pointer select-none text-sm text-zinc-300">
+            Reference angles{" "}
+            <span className="text-xs text-zinc-500">
+              ({geminiRefImages.length})
+            </span>
+          </summary>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {geminiRefImages.map((url, idx) => {
+              const usedByKling = idx < klingRefImages.length;
+              const label = usedByKling
+                ? `Angle ${idx + 1} (video + prompt)`
+                : `Angle ${idx + 1} (prompt only)`;
+
+              return (
+                <a
+                  key={`${url}-${idx}`}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group"
+                  title={label}
+                >
+                  <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+                    <img
+                      src={url}
+                      alt={label}
+                      className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                      loading="lazy"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                    {label}
+                  </p>
+                </a>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-zinc-500">
+            <span>Angle order matters.</span>
+            {run.source_url && (
+              <a
+                href={run.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-zinc-400 hover:text-zinc-200 transition-colors underline underline-offset-2"
+              >
+                View product page
+              </a>
+            )}
+          </div>
+        </details>
       )}
     </div>
   );
