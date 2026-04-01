@@ -201,6 +201,9 @@ function toFriendlyError(raw: string): string {
   if (lower.includes("model_name") && lower.includes("invalid"))
     return "Video model configuration is invalid. Please update the model setting and try again.";
 
+  if (lower.includes("prompt: size must be between 0 and 2500") || lower.includes("prompt too long"))
+    return "We generated a scene description that's too detailed for the video engine. Please try again.";
+
   if (lower.includes("kling_model_name not set"))
     return "Video model is not configured yet. Please set KLING_MODEL_NAME and try again.";
 

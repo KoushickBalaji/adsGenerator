@@ -4,6 +4,7 @@ import { generateKlingPromptWithGemini } from "../_shared/geminiPrompt.ts";
 import {
   BRAND_ELEMENT_NAME_PREFIX,
   createCustomElement,
+  deleteCustomElement,
   isElementNameEligible,
   listCustomElements,
   listPresetElements,
@@ -404,6 +405,137 @@ serve(async (req) => {
       );
     }
 
+    // Utility mode: bulk-delete Kling custom elements.
+    // POST /functions/v1/test-prompt?mode=elements-delete
+    // Headers: x-admin-secret: <WEBHOOK_SECRET>
+    // Body:
+    // {
+    //   "dry_run": true,
+    //   "prefix": "bluestone",
+    //   "ids": ["306839634890536"],
+    //   "names": ["bluestone-muse-01"],
+    //   "confirm": "DELETE"
+    // }
+    // Notes:
+    // - If ids/names are omitted, deletes all custom elements whose names start with `prefix`.
+    // - When dry_run is false, you MUST include confirm="DELETE" to proceed.
+    if (req.method === "POST" && mode === "elements-delete") {
+      const adminSecret = req.headers.get("x-admin-secret") ?? "";
+      const expected = Deno.env.get("WEBHOOK_SECRET") ?? "";
+      if (!expected) {
+        return json({ error: "Server misconfigured: WEBHOOK_SECRET not set" }, 500);
+      }
+      if (adminSecret !== expected) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+
+      const body = (await req.json()) as Record<string, unknown>;
+      const dryRun =
+        (body.dry_run as boolean | undefined) ??
+        (body.dryRun as boolean | undefined) ??
+        true;
+
+      const confirm = typeof body.confirm === "string" ? body.confirm.trim() : "";
+      if (!dryRun && confirm !== "DELETE") {
+        return json(
+          {
+            error: 'Missing confirmation. Set "confirm": "DELETE" to proceed.',
+          },
+          400
+        );
+      }
+
+      const prefix =
+        typeof body.prefix === "string" && body.prefix.trim().length > 0
+          ? body.prefix.trim()
+          : BRAND_ELEMENT_NAME_PREFIX;
+
+      const ids = Array.isArray(body.ids)
+        ? body.ids.map((x) => String(x).trim()).filter(Boolean)
+        : [];
+      const names = Array.isArray(body.names)
+        ? body.names.map((x) => String(x).trim()).filter(Boolean)
+        : [];
+
+      const allCustom: Awaited<ReturnType<typeof listCustomElements>> = [];
+      for (let page = 1; page <= 20; page++) {
+        const pageEls = await listCustomElements(page, 100);
+        allCustom.push(...pageEls);
+        if (pageEls.length < 100) break;
+      }
+
+      const byId = new Map(allCustom.map((e) => [String(e.id), e]));
+      const normalizeName = (n: string) => n.trim().toLowerCase().replace(/\s+/g, " ");
+      const byName = new Map<string, typeof allCustom>();
+      for (const el of allCustom) {
+        const key = normalizeName(el.name);
+        const arr = byName.get(key) ?? [];
+        arr.push(el);
+        byName.set(key, arr);
+      }
+
+      const targets: typeof allCustom = [];
+      const notFound: Array<{ id?: string; name?: string }> = [];
+
+      if (ids.length > 0) {
+        for (const id of ids) {
+          const match = byId.get(id);
+          if (match) targets.push(match);
+          else notFound.push({ id });
+        }
+      } else if (names.length > 0) {
+        for (const n of names) {
+          const matches = byName.get(normalizeName(n)) ?? [];
+          if (matches.length === 0) notFound.push({ name: n });
+          else targets.push(...matches);
+        }
+      } else {
+        targets.push(...allCustom.filter((e) => isElementNameEligible(e.name, prefix)));
+      }
+
+      // De-duplicate by id
+      const seen = new Set<string>();
+      const deduped = targets.filter((t) => {
+        const id = String(t.id);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+
+      const results: Array<Record<string, unknown>> = [];
+      for (const el of deduped) {
+        if (dryRun) {
+          results.push({ id: el.id, name: el.name, status: "dry_run" });
+          continue;
+        }
+        try {
+          const res = await deleteCustomElement(el.id);
+          results.push({ id: el.id, name: el.name, status: "deleted", response: res });
+        } catch (err) {
+          results.push({ id: el.id, name: el.name, status: "error", error: String(err) });
+        }
+      }
+
+      const deletedCount = results.filter((r) => r.status === "deleted").length;
+      const errorCount = results.filter((r) => r.status === "error").length;
+
+      return json(
+        {
+          mode: "elements-delete",
+          dry_run: dryRun,
+          prefix,
+          selection: ids.length > 0 ? { ids } : names.length > 0 ? { names } : { prefix },
+          total_custom: allCustom.length,
+          matched: deduped.length,
+          deleted: deletedCount,
+          errors: errorCount,
+          not_found: notFound,
+          results,
+        },
+        200
+      );
+    }
+
     // Default mode: generate the Gemini prompt for a given BlueStone product URL.
     // This is intentionally POST-only to avoid confusing "Unexpected end of JSON input"
     // errors when calling the function with GET from tools like Postman.
@@ -451,12 +583,8 @@ serve(async (req) => {
     const product = await scrapeProduct(url);
 
     // Generate Gemini prompt using the exact same logic as create-run
-    const { prompt, request } = await generateKlingPromptWithGemini(
-      {
-        product_title: product.product_title,
-        product_description: product.product_description,
-        product_category: product.product_category,
-      },
+    const { prompt, request, usageMetadata } = await generateKlingPromptWithGemini(
+      product,
       product.input_images.length
     );
 
@@ -481,6 +609,12 @@ serve(async (req) => {
         generation_config: request.generationConfig,
         system_prompt: request.systemPrompt,
         user_message: request.userMessage,
+        input_images: {
+          urls: request.productImageUrls,
+          context: request.geminiImageContext,
+        },
+        usage_metadata: usageMetadata,
+        output_length_chars: prompt.length,
         output: prompt,
       },
       validation: {

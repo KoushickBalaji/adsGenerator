@@ -10,9 +10,13 @@ const KLING_BASE_URL = (Deno.env.get("KLING_BASE_URL") ??
 // This prevents accidentally selecting leftover test elements from the Kling account.
 export const BRAND_ELEMENT_NAME_PREFIX = "bluestone";
 
-// JWT token cache — reuse until close to expiry
+// JWT token cache - reuse until close to expiry
 let cachedToken: string | null = null;
 let tokenExpiresAt = 0;
+
+// Best-effort anti-repeat for ambassador selection.
+// Note: Edge Functions may run on multiple isolates/instances, so this is not a global guarantee.
+let lastPickedCustomElementId: string | null = null;
 
 /** Generate a JWT from KLING_ACCESS_KEY + KLING_SECRET_KEY */
 async function generateJWT(): Promise<string> {
@@ -150,6 +154,13 @@ export type CreateCustomElementResponse = {
   data?: unknown;
 };
 
+export type DeleteCustomElementResponse = {
+  code: number;
+  message: string;
+  request_id: string;
+  data?: unknown;
+};
+
 function parseJsonPreservingLargeIds(text: string): any {
   // Kling element IDs can exceed JS' MAX_SAFE_INTEGER; if parsed as numbers we lose precision
   // and later send the wrong id back to Kling ("Element id not found").
@@ -276,6 +287,33 @@ export async function createCustomElement(
   return data as CreateCustomElementResponse;
 }
 
+/** Delete a CUSTOM element (brand-owned subject) */
+export async function deleteCustomElement(
+  elementId: string
+): Promise<DeleteCustomElementResponse> {
+  const headers = await getHeaders();
+  const url = `${KLING_BASE_URL}/v1/general/delete-elements`;
+  console.log("[deleteCustomElement] Deleting:", elementId);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ element_id: String(elementId) }),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Kling delete-elements API error ${res.status}: ${text}`);
+  }
+
+  const data = parseJsonPreservingLargeIds(text) ?? {
+    code: 0,
+    message: "ok",
+    request_id: "",
+  };
+  return data as DeleteCustomElementResponse;
+}
+
 /** Pick a random CUSTOM element from the account */
 export async function getRandomElement(opts: {
   namePrefix?: string;
@@ -296,8 +334,14 @@ export async function getRandomElement(opts: {
     return null;
   }
 
-  const idx = Math.floor(Math.random() * eligible.length);
-  const picked = eligible[idx];
+  const pool =
+    eligible.length > 1 && lastPickedCustomElementId
+      ? eligible.filter((e) => e.id !== lastPickedCustomElementId)
+      : eligible;
+
+  const idx = Math.floor(Math.random() * pool.length);
+  const picked = pool[idx];
+  lastPickedCustomElementId = picked.id;
   console.log(`[getRandomElement] Picked element: ${picked.name} (${picked.id})`);
   return picked;
 }

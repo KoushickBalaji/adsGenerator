@@ -270,7 +270,10 @@ How to verify:
 
 Cleanup note:
 - This demo **never uses** elements whose names don’t start with `bluestone`, so leftover test elements are safe to ignore.
-- If you want to delete old custom elements, use the Kling console / account tooling (the JWT API used here documents create + list, but a delete endpoint isn’t currently wired into this repo).
+- If you want to delete old **custom** elements via the API, use the existing Edge Function (no new function):
+  - `POST /functions/v1/test-prompt?mode=elements-delete`
+  - Header: `x-admin-secret: <WEBHOOK_SECRET>`
+  - Start with `dry_run: true` and verify the list before running with `dry_run: false` + `confirm: "DELETE"`.
 
 How to create a few elements quickly (local bulk upload):
 1. Copy `scripts/kling-elements-manifest.example.json` and update names + image paths (you can point to different folders on `D:\`).
@@ -303,6 +306,16 @@ How to create a few elements quickly (Vercel-hosted images + Postman, no local k
 
 Note:
 - These images are not linked from the UI, but any publicly reachable URL is technically accessible if someone knows the exact path.
+
+How to delete old `bluestone*` elements (API cleanup):
+1. List what exists:
+   - `GET /functions/v1/test-prompt?mode=elements&kind=custom&all=true&pageSize=100`
+2. Dry run delete by prefix:
+   - `POST /functions/v1/test-prompt?mode=elements-delete`
+   - Header: `x-admin-secret: <WEBHOOK_SECRET>`
+   - Body: `scripts/bluestone-elements-delete.example.json` (starts as `dry_run: true`)
+3. Real delete:
+   - Re-run with `dry_run: false` and `confirm: "DELETE"`.
 
 ## Success Criteria
 
