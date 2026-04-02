@@ -282,16 +282,6 @@ export default function Home() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      {/* Header */}
-      <header className="border-b border-zinc-800 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold tracking-tight">
-            BlueStone Video Generator
-          </h1>
-          <span className="text-xs text-zinc-500">Demo</span>
-        </div>
-      </header>
-
       {/* Disclaimer consent overlay */}
       {showDisclaimer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -327,9 +317,9 @@ export default function Home() {
         </div>
       )}
 
-      <main className="flex min-h-0 flex-1 flex-col px-6 py-4">
+      <main className="flex min-h-0 flex-1 flex-col px-6 pt-4 pb-2">
         {/* Input */}
-        <section className="mx-auto w-full max-w-4xl mb-4 flex-shrink-0">
+        <section className="mx-auto w-full max-w-4xl mb-3 flex-shrink-0">
           <UrlInput onSubmit={handleGenerate} disabled={starting} />
           {error && (
             <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
@@ -351,7 +341,7 @@ export default function Home() {
           )}
         </section>
 
-        <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr_3fr_1fr]">
+        <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[2fr_3fr_2fr]">
           {/* History sidebar - left */}
           <aside className="order-2 lg:order-1 min-h-0 overflow-y-auto">
             <h2 className="mb-3 text-sm font-medium text-zinc-400">
@@ -365,7 +355,7 @@ export default function Home() {
           </aside>
 
           {/* Active run / main area - center */}
-          <section className="order-1 lg:order-2 min-h-0 overflow-y-auto">
+          <section className="order-1 lg:order-2 min-h-0 overflow-hidden">
             {activeRun ? (
               <ProgressCard run={activeRun} onRefresh={handleRefresh} />
             ) : (
@@ -378,7 +368,7 @@ export default function Home() {
           </section>
 
           {/* Reference images - right */}
-          <aside className="order-3 min-h-0 overflow-y-auto">
+          <aside className="order-3 min-h-0 overflow-hidden">
             {activeRun && <ReferencePanel run={activeRun} />}
           </aside>
         </div>

@@ -234,7 +234,7 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
 
 export function ProgressCard({ run, onRefresh }: Props) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+    <div className="flex h-full flex-col rounded-xl border border-zinc-800 bg-zinc-900 p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-medium text-zinc-100">
@@ -282,19 +282,17 @@ export function ProgressCard({ run, onRefresh }: Props) {
 
       {/* Completed state */}
       {run.status === "completed" && run.output_video_url && (
-        <div className="space-y-3">
-          <div className="relative">
-            <video
-              src={run.output_video_url}
-              controls
-              controlsList="nodownload noremoteplayback"
-              disablePictureInPicture
-              className="w-full rounded-lg"
-              poster={run.thumbnail_url || undefined}
-            />
-            <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-white/10 bg-black/40 px-3 py-1 text-[11px] font-medium tracking-wide text-white/90 backdrop-blur-sm">
-              Not for commercial use
-            </div>
+        <div className="min-h-0 flex-1 relative">
+          <video
+            src={run.output_video_url}
+            controls
+            controlsList="nodownload noremoteplayback"
+            disablePictureInPicture
+            className="h-full w-full rounded-lg object-contain"
+            poster={run.thumbnail_url || undefined}
+          />
+          <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-white/10 bg-black/40 px-3 py-1 text-[11px] font-medium tracking-wide text-white/90 backdrop-blur-sm">
+            Not for commercial use
           </div>
         </div>
       )}
