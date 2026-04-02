@@ -119,13 +119,14 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
   // Calculate total progress
   const totalDuration = PIPELINE_STEPS.reduce((sum, s) => sum + s.duration, 0);
   const progress = Math.min((elapsed / totalDuration) * 100, 95); // Cap at 95% until completed
+  const isOvertime = elapsed > totalDuration;
 
   return (
     <div className="space-y-4">
       {/* Progress bar */}
       <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-blue-600 via-blue-400 to-cyan-400 transition-all duration-500 ease-out"
+          className={`h-full rounded-full bg-gradient-to-r from-blue-600 via-blue-400 to-cyan-400 transition-all duration-500 ease-out${isOvertime ? " animate-pulse" : ""}`}
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -209,14 +210,29 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
         <span>
           {Math.floor(elapsed / 60000)}:{String(Math.floor((elapsed % 60000) / 1000)).padStart(2, "0")} elapsed
         </span>
-        <span>May take a few minutes - take a look around or try another item while you wait</span>
+        {isOvertime ? (
+          <span className="text-amber-400/80">Taking longer than usual &mdash; feel free to browse your other videos while we finish up</span>
+        ) : (
+          <span>May take a few minutes - take a look around or try another item while you wait</span>
+        )}
       </div>
+
+      {/* Overtime notice */}
+      {isOvertime && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <svg className="mt-0.5 w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-amber-300/80">
+            This is taking longer than expected. Your video is still being generated &mdash; check back shortly or explore other items in your history.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
 export function ProgressCard({ run, onRefresh }: Props) {
-  const klingRefImages = (run.input_images ?? []).slice(0, 3);
   const geminiRefImages = run.input_images ?? [];
 
   return (
@@ -310,10 +326,7 @@ export function ProgressCard({ run, onRefresh }: Props) {
 
           <div className="mt-3 grid grid-cols-2 gap-3">
             {geminiRefImages.map((url, idx) => {
-              const usedByKling = idx < klingRefImages.length;
-              const label = usedByKling
-                ? `Angle ${idx + 1} (video + prompt)`
-                : `Angle ${idx + 1} (prompt only)`;
+              const label = `Angle ${idx + 1}`;
 
               return (
                 <a
