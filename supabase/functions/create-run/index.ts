@@ -29,7 +29,7 @@ serve(async (req) => {
     // We'll try the preferred model first, then fall back if Kling rejects it as invalid.
     const KLING_MODEL_CANDIDATES = ["kling-v3-omni", "kling-v3"] as const;
 
-    const { url } = await req.json();
+    const { url, runId } = await req.json();
 
     // Validate URL
     if (!url || typeof url !== "string") {
@@ -90,11 +90,32 @@ serve(async (req) => {
       );
     }
 
-    // Step 2: Scrape product data
-    const product = await scrapeProduct(url);
-    console.log(`[step 2] Scraped: "${product.product_title}", ${product.input_images.length} images`);
+    // Step 2: Insert DB row early so the UI can reflect "in progress" immediately
+    // (even while we are still scraping and calling upstream services).
+    const insertPayload: Record<string, unknown> = {
+      source_url: url,
+      status: "processing",
+    };
+    if (typeof runId === "string" && isUuid(runId)) {
+      insertPayload.id = runId;
+    }
 
-    // Step 3: Fetch a random brand ambassador element - required
+    const { data: run, error: insertError } = await supabase
+      .from("video_runs")
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+    insertedRunId = run.id;
+
+    // Step 3: Scrape product data
+    const product = await scrapeProduct(url);
+    console.log(
+      `[step 3] Scraped: "${product.product_title}", ${product.input_images.length} images`
+    );
+
+    // Step 4: Fetch a random brand ambassador element - required
     const element = await getRandomElement({
       namePrefix: BRAND_ELEMENT_NAME_PREFIX,
     });
@@ -109,48 +130,44 @@ serve(async (req) => {
         `Selected element "${element.name}" is not eligible. Expected name to start with "${BRAND_ELEMENT_NAME_PREFIX}".`
       );
     }
-    console.log(`[step 3] Ambassador: ${element.name} (${element.id})`);
+    console.log(`[step 4] Ambassador: ${element.name} (${element.id})`);
 
-    // Step 4: Generate prompt (always includes <<<element_1>>> + <<<image_1>>>...)
+    // Step 5: Generate prompt (always includes <<<element_1>>> + <<<image_1>>>...)
     const { prompt, request } = await generateKlingPromptWithGemini(
       product,
       product.input_images.length
     );
-    console.log(`[step 4] Prompt: ${prompt}`);
+    console.log(`[step 5] Prompt: ${prompt}`);
     console.log(
-      `[step 4] Selected reference angles (first 3): ${(request.productImageUrls || [])
+      `[step 5] Selected reference angles (first 3): ${(request.productImageUrls || [])
         .slice(0, 3)
         .join(", ")}`
     );
 
-    // Step 5: Insert DB row
-    const { data: run, error: dbError } = await supabase
+    // Step 6: Update DB row with product + prompt details
+    const { error: updateError } = await supabase
       .from("video_runs")
-      .insert({
-        source_url: url,
+      .update({
         product_title: product.product_title,
         product_category: product.product_category,
-        status: "queued",
         // Persist the ordered references used for this run:
         // - first 3 are used by Kling (video + prompt tokens)
         // - remaining (if any) are prompt-only context
         input_images: request.productImageUrls,
         prompt,
       })
-      .select()
-      .single();
+      .eq("id", run.id);
 
-    if (dbError) throw dbError;
-    insertedRunId = run.id;
+    if (updateError) throw updateError;
 
-    // Step 6: Call Kling Omni-Video API (O-series, e.g. O3)
+    // Step 7: Call Kling Omni-Video API (O-series, e.g. O3)
     const webhookUrl = Deno.env.get("SUPABASE_URL")
       ? `${Deno.env.get("SUPABASE_URL")}/functions/v1/kling-webhook`
       : undefined;
 
     const imgs = request.productImageUrls;
     console.log(
-      `[step 6] Kling model candidates: ${KLING_MODEL_CANDIDATES.join(", ")}`
+      `[step 7] Kling model candidates: ${KLING_MODEL_CANDIDATES.join(", ")}`
     );
     const imageList = imgs.slice(0, 3).map((imageUrl) => ({
       image_url: imageUrl,
@@ -163,7 +180,7 @@ serve(async (req) => {
 
     for (const modelName of KLING_MODEL_CANDIDATES) {
       try {
-        console.log(`[step 6] Trying Kling model: ${modelName}`);
+        console.log(`[step 7] Trying Kling model: ${modelName}`);
         klingRes = await createOmniVideo({
           model_name: modelName,
           prompt,
@@ -174,7 +191,7 @@ serve(async (req) => {
           mode: "pro",
           callback_url: webhookUrl,
         });
-        console.log(`[step 6] Using Kling model: ${modelName}`);
+        console.log(`[step 7] Using Kling model: ${modelName}`);
         break;
       } catch (err) {
         lastError = err;
@@ -182,7 +199,7 @@ serve(async (req) => {
         // Only fall back when Kling explicitly rejects the model name.
         if (msg.toLowerCase().includes("model_name") && msg.toLowerCase().includes("invalid")) {
           console.warn(
-            `[step 6] Kling rejected model "${modelName}" as invalid; trying next candidate.`
+            `[step 7] Kling rejected model "${modelName}" as invalid; trying next candidate.`
           );
           continue;
         }
@@ -196,10 +213,10 @@ serve(async (req) => {
         : new Error("Kling request failed");
     }
 
-    console.log(`[step 6] Kling task: ${klingRes.data.task_id}`);
+    console.log(`[step 7] Kling task: ${klingRes.data.task_id}`);
     createdProviderJobId = klingRes.data.task_id;
 
-    // Step 7: Update row with provider job ID
+    // Step 8: Update row with provider job ID
     await supabase
       .from("video_runs")
       .update({
@@ -292,4 +309,10 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
+}
+
+function isUuid(input: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    input
+  );
 }

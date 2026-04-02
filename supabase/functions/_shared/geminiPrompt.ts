@@ -31,6 +31,7 @@ type JewellerySpec = {
   noun: string; // e.g. "ring", "necklace", "earrings"
   shot1WornText: string; // must include all image refs
   shot2WornText: string; // no image refs
+  sizeCue: string; // short, qualitative scale guidance
   visibilityAnchor: string; // what must stay visible (hand/neckline/ears/wrist)
   placement: Record<string, unknown>;
   framingHint: string;
@@ -73,6 +74,7 @@ function getJewellerySpec(
         noun,
         shot1WornText,
         shot2WornText,
+        sizeCue: "realistic scale; single ring, not chunky/oversized",
         visibilityAnchor: "ring hand (single ring; one hand only)",
         placement: { hand: "right", finger: "ring", other_hand: "bare" },
         framingHint:
@@ -101,6 +103,7 @@ function getJewellerySpec(
         noun,
         shot1WornText,
         shot2WornText,
+        sizeCue: "realistic scale; delicate chain, petite pendant; not oversized",
         visibilityAnchor: "neckline/collarbone (jewellery centered and unobstructed)",
         placement: { area: "neckline/collarbone", centered: true },
         framingHint:
@@ -124,6 +127,7 @@ function getJewellerySpec(
         noun,
         shot1WornText,
         shot2WornText,
+        sizeCue: "realistic scale; subtle everyday earrings, not oversized",
         visibilityAnchor: "both ears (hair tucked back)",
         placement: { ears: "both", hair: "tucked behind ears" },
         framingHint:
@@ -148,6 +152,7 @@ function getJewellerySpec(
         noun,
         shot1WornText,
         shot2WornText,
+        sizeCue: "realistic scale; single bracelet/bangle, not chunky",
         visibilityAnchor: "one wrist/forearm (unobstructed)",
         placement: { wrist: "right" },
         framingHint:
@@ -171,6 +176,7 @@ function getJewellerySpec(
         noun,
         shot1WornText,
         shot2WornText,
+        sizeCue: "realistic scale; subtle, not oversized",
         visibilityAnchor: "the jewellery area (clearly visible and unobstructed)",
         placement: { area: "clearly visible" },
         framingHint: "face + upper body + jewellery clearly visible",
@@ -372,6 +378,7 @@ export function buildGeminiKlingPromptRequest(
     },
     jewellery: {
       worn_text: jewellery.shot1WornText,
+      size_cue: jewellery.sizeCue,
       type: jewellery.kind,
       count: 1,
       placement: jewellery.placement,
@@ -434,6 +441,7 @@ ${ambassadorRuleLine}
 - BEST PRACTICE: define the jewellery ONCE using ALL image tokens together, e.g. "${jewellery.shot1WornText}". After that, refer only to "${jewellery.shot2WornText}" (no new ref tokens in later mentions).
 - The ambassador wears ONLY the referenced jewellery piece. Show exactly ONE referenced piece (count = 1) and avoid any other jewellery (no extra rings, necklaces, earrings, bracelets, watches).
 - If the jewellery is a ring: show exactly ONE ring total. No rings on the other hand or any other fingers.
+- Size realism: keep the jewellery at a believable real-world scale based on the reference photos (no oversized statement scaling). In Shot 1 JSON, include a short jewellery.size_cue describing approximate scale (qualitative; keep it short).
 - Visibility anchor for this category: keep ${jewellery.visibilityAnchor} visible as a secondary detail in BOTH shots (never posed or pushed toward the lens).
 - NEVER use the product's name or brand name. Avoid other proper nouns (people/places). Refer to the jewellery only through the image tokens or generic descriptions like "the ring", "the necklace", etc.
 
@@ -506,6 +514,7 @@ The ambassador is <<<element_1>>>. The product images are: ${imageRefStr}.
 You MUST use every single one of these tokens in your prompt.
 In Shot 1 JSON, set jewellery.worn_text to exactly: "${jewellery.shot1WornText}".
 In Shot 2 JSON, set jewellery.worn_text to exactly: "${jewellery.shot2WornText}" (do not include any ${imageRefStr} tokens in Shot 2).
+In Shot 1 JSON, include jewellery.size_cue as a short, qualitative description of realistic scale based on the reference photos (e.g., "delicate, petite; not oversized").
 Story: portray <<<element_1>>> as a modern, successful woman in her day-to-day life. Include at least one high-stakes-but-real moment (e.g., prepping/leading a presentation, important meeting, commute to a big pitch). The jewellery must be incidental - never deliberately shown to the camera.
 Wardrobe: business professional (corporate/boardroom). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).
 

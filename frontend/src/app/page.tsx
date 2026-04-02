@@ -106,9 +106,37 @@ export default function Home() {
     setError("");
     setStarting(true);
 
+    const nowIso = new Date().toISOString();
+    const optimisticRunId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    // Optimistically add the run immediately so the UI reflects "in progress"
+    // without waiting for the Edge Function to finish all upstream calls.
+    const optimisticRun: VideoRun = {
+      id: optimisticRunId,
+      source_url: url,
+      product_title: null,
+      product_category: null,
+      status: "processing",
+      provider: "kling",
+      provider_job_id: null,
+      input_images: [],
+      prompt: null,
+      output_video_url: null,
+      thumbnail_url: null,
+      error_message: null,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    setActiveRun(optimisticRun);
+    setRuns((prev) => [optimisticRun, ...prev]);
+
     try {
       const res = await supabase.functions.invoke("create-run", {
-        body: { url },
+        body: { url, runId: optimisticRunId },
       });
 
       if (res.error) {
@@ -122,19 +150,26 @@ export default function Home() {
         );
       }
 
-      const { runId } = res.data;
+      const { runId } = res.data as { runId?: string };
+      const effectiveRunId = runId || optimisticRunId;
 
       // Fetch the created run
       const { data: run } = await supabase
         .from("video_runs")
         .select("*")
-        .eq("id", runId)
+        .eq("id", effectiveRunId)
         .single();
 
       if (run) {
         const videoRun = run as VideoRun;
-        setActiveRun(videoRun);
-        setRuns((prev) => [videoRun, ...prev]);
+        setRuns((prev) => {
+          // Replace optimistic entry (if any) and avoid duplicates
+          const withoutOptimistic = prev.filter(
+            (r) => r.id !== optimisticRunId && r.id !== videoRun.id
+          );
+          return [videoRun, ...withoutOptimistic];
+        });
+        setActiveRun((prev) => (prev?.id === optimisticRunId ? videoRun : prev));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
@@ -146,9 +181,46 @@ export default function Home() {
         msg.includes("Relay Error invoking the Edge Function") ||
         msg.includes("Failed to send a request to the Edge Function")
       ) {
-        setError("Unable to reach the server. Please check your connection and try again.");
+        const friendly =
+          "Unable to reach the server. Please check your connection and try again.";
+        setError(friendly);
+        setRuns((prev) =>
+          prev.map((r) =>
+            r.id === optimisticRunId
+              ? { ...r, status: "failed", error_message: friendly, updated_at: new Date().toISOString() }
+              : r
+          )
+        );
+        setActiveRun((prev) =>
+          prev?.id === optimisticRunId
+            ? {
+                ...prev,
+                status: "failed",
+                error_message: friendly,
+                updated_at: new Date().toISOString(),
+              }
+            : prev
+        );
       } else {
-        setError(msg || "Something unexpected happened. Please try again.");
+        const friendly = msg || "Something unexpected happened. Please try again.";
+        setError(friendly);
+        setRuns((prev) =>
+          prev.map((r) =>
+            r.id === optimisticRunId
+              ? { ...r, status: "failed", error_message: friendly, updated_at: new Date().toISOString() }
+              : r
+          )
+        );
+        setActiveRun((prev) =>
+          prev?.id === optimisticRunId
+            ? {
+                ...prev,
+                status: "failed",
+                error_message: friendly,
+                updated_at: new Date().toISOString(),
+              }
+            : prev
+        );
       }
     }
 
