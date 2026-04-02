@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase, type VideoRun } from "@/lib/supabase";
 import { UrlInput } from "@/components/url-input";
-import { ProgressCard } from "@/components/progress-card";
+import { ProgressCard, ReferencePanel } from "@/components/progress-card";
 import { HistoryList } from "@/components/history-list";
 
 export default function Home() {
@@ -291,7 +291,7 @@ export default function Home() {
     <div className="min-h-screen">
       {/* Header */}
       <header className="border-b border-zinc-800 px-6 py-4">
-        <div className="mx-auto max-w-5xl flex items-center justify-between">
+        <div className="mx-auto max-w-7xl flex items-center justify-between">
           <h1 className="text-lg font-semibold tracking-tight">
             BlueStone Video Generator
           </h1>
@@ -337,7 +337,7 @@ export default function Home() {
         </div>
       )}
 
-      <main className="mx-auto max-w-5xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-6 py-8">
         {/* Input */}
         <section className="mb-8">
           <UrlInput onSubmit={handleGenerate} disabled={starting} />
@@ -361,8 +361,20 @@ export default function Home() {
           )}
         </section>
 
-        <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
-          {/* Active run / main area */}
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr_220px]">
+          {/* History sidebar - left */}
+          <aside className="order-2 lg:order-1 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-2">
+            <h2 className="mb-3 text-sm font-medium text-zinc-400">
+              History
+            </h2>
+            <HistoryList
+              runs={runs}
+              onSelect={handleSelectRun}
+              selectedId={activeRun?.id ?? null}
+            />
+          </aside>
+
+          {/* Active run / main area - center */}
           <section className="order-1 lg:order-2">
             {activeRun ? (
               <ProgressCard run={activeRun} onRefresh={handleRefresh} />
@@ -375,16 +387,9 @@ export default function Home() {
             )}
           </section>
 
-          {/* History sidebar */}
-          <aside className="order-2 lg:order-1">
-            <h2 className="mb-3 text-sm font-medium text-zinc-400">
-              History
-            </h2>
-            <HistoryList
-              runs={runs}
-              onSelect={handleSelectRun}
-              selectedId={activeRun?.id ?? null}
-            />
+          {/* Reference images - right */}
+          <aside className="order-3 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pl-2">
+            {activeRun && <ReferencePanel run={activeRun} />}
           </aside>
         </div>
       </main>
