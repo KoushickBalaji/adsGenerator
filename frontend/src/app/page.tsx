@@ -11,14 +11,7 @@ export default function Home() {
   const [activeRun, setActiveRun] = useState<VideoRun | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
-  const [showDisclaimer, setShowDisclaimer] = useState(false);
-
-  // Show disclaimer on first visit
-  useEffect(() => {
-    if (localStorage.getItem("disclaimer-dismissed") !== "true") {
-      setShowDisclaimer(true);
-    }
-  }, []);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
 
   // Load history on mount
   useEffect(() => {
@@ -325,10 +318,7 @@ export default function Home() {
               </p>
             </div>
             <button
-              onClick={() => {
-                setShowDisclaimer(false);
-                localStorage.setItem("disclaimer-dismissed", "true");
-              }}
+              onClick={() => setShowDisclaimer(false)}
               className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
             >
               I Understand &mdash; Continue

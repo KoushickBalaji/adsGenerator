@@ -324,7 +324,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
       <h3 className="text-sm font-medium text-zinc-300 mb-3">
-        Reference Angles{" "}
+        Reference Images{" "}
         <span className="text-xs text-zinc-500 font-normal">({images.length})</span>
       </h3>
 

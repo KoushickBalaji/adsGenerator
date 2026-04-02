@@ -53,7 +53,11 @@ export function UrlInput({ onSubmit, disabled }: Props) {
           {disabled ? "Generating..." : "Generate Video"}
         </button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {error ? (
+        <p className="mt-2 text-sm text-red-400">{error}</p>
+      ) : (
+        <p className="mt-2 text-xs text-zinc-500">Copy and paste the URL of any jewel from BlueStone</p>
+      )}
     </form>
   );
 }
