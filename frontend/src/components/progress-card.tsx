@@ -283,14 +283,19 @@ export function ProgressCard({ run, onRefresh }: Props) {
       {/* Completed state */}
       {run.status === "completed" && run.output_video_url && (
         <div className="space-y-3">
-          <video
-            src={run.output_video_url}
-            controls
-            controlsList="nodownload noremoteplayback"
-            disablePictureInPicture
-            className="w-full rounded-lg"
-            poster={run.thumbnail_url || undefined}
-          />
+          <div className="relative">
+            <video
+              src={run.output_video_url}
+              controls
+              controlsList="nodownload noremoteplayback"
+              disablePictureInPicture
+              className="w-full rounded-lg"
+              poster={run.thumbnail_url || undefined}
+            />
+            <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-white/10 bg-black/40 px-3 py-1 text-[11px] font-medium tracking-wide text-white/90 backdrop-blur-sm">
+              Not for commercial use
+            </div>
+          </div>
         </div>
       )}
 
@@ -328,7 +333,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
         <span className="text-xs text-zinc-500 font-normal">({images.length})</span>
       </h3>
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
         {images.map((url, idx) => {
           const label = `Angle ${idx + 1}`;
 
@@ -349,7 +354,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
                   loading="lazy"
                 />
               </div>
-              <p className="mt-1 text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">
+              <p className="mt-1 text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors text-center">
                 {label}
               </p>
             </a>

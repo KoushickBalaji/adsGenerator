@@ -281,10 +281,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="flex h-screen flex-col overflow-hidden">
       {/* Header */}
       <header className="border-b border-zinc-800 px-6 py-4">
-        <div className="mx-auto max-w-7xl flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold tracking-tight">
             BlueStone Video Generator
           </h1>
@@ -327,9 +327,9 @@ export default function Home() {
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="flex min-h-0 flex-1 flex-col px-6 py-4">
         {/* Input */}
-        <section className="mb-8">
+        <section className="mx-auto w-full max-w-4xl mb-4 flex-shrink-0">
           <UrlInput onSubmit={handleGenerate} disabled={starting} />
           {error && (
             <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
@@ -351,9 +351,9 @@ export default function Home() {
           )}
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[280px_1fr_220px]">
+        <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr_3fr_1fr]">
           {/* History sidebar - left */}
-          <aside className="order-2 lg:order-1 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-2">
+          <aside className="order-2 lg:order-1 min-h-0 overflow-y-auto">
             <h2 className="mb-3 text-sm font-medium text-zinc-400">
               History
             </h2>
@@ -365,7 +365,7 @@ export default function Home() {
           </aside>
 
           {/* Active run / main area - center */}
-          <section className="order-1 lg:order-2">
+          <section className="order-1 lg:order-2 min-h-0 overflow-y-auto">
             {activeRun ? (
               <ProgressCard run={activeRun} onRefresh={handleRefresh} />
             ) : (
@@ -378,7 +378,7 @@ export default function Home() {
           </section>
 
           {/* Reference images - right */}
-          <aside className="order-3 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pl-2">
+          <aside className="order-3 min-h-0 overflow-y-auto">
             {activeRun && <ReferencePanel run={activeRun} />}
           </aside>
         </div>
