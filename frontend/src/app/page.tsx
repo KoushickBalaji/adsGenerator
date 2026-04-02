@@ -299,21 +299,29 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Disclaimer banner */}
+      {/* Disclaimer consent overlay */}
       {showDisclaimer && (
-        <div className="border-b border-zinc-800 bg-zinc-900/80">
-          <div className="mx-auto max-w-5xl px-6 py-3 flex items-start gap-3">
-            <svg className="mt-0.5 w-5 h-5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-            </svg>
-            <div className="flex-1 text-sm">
-              <p className="font-medium text-zinc-200">Technology Capability Demonstration</p>
-              <p className="mt-1 text-zinc-400 leading-relaxed">
-                This application is a technology demonstration only. References to public figures and their
-                likenesses are used solely to showcase AI video generation capabilities and are not intended
-                for commercial use, distribution, or endorsement. No content generated here should be used
-                to impersonate, misrepresent, or create a false association with any real person, nor to
-                obtain any personal, commercial, or financial advantage through such likeness.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="mx-4 max-w-lg rounded-2xl border border-zinc-700 bg-zinc-900 p-8 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <svg className="w-6 h-6 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+              </svg>
+              <h2 className="text-lg font-semibold text-zinc-100">Before You Continue</h2>
+            </div>
+            <div className="space-y-3 text-sm text-zinc-400 leading-relaxed">
+              <p>
+                This application is a <span className="text-zinc-200 font-medium">technology capability demonstration only</span>.
+              </p>
+              <p>
+                References to public figures and their likenesses are used intentionally to showcase
+                AI video generation capabilities. This content is <span className="text-zinc-200 font-medium">not intended for commercial use,
+                distribution, or endorsement</span>.
+              </p>
+              <p>
+                By proceeding, you acknowledge that generated content must not be used to impersonate,
+                misrepresent, or create a false association with any real person, nor to obtain any
+                personal, commercial, or financial advantage through such likeness.
               </p>
             </div>
             <button
@@ -321,11 +329,9 @@ export default function Home() {
                 setShowDisclaimer(false);
                 localStorage.setItem("disclaimer-dismissed", "true");
               }}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors flex-shrink-0"
+              className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              I Understand &mdash; Continue
             </button>
           </div>
         </div>
