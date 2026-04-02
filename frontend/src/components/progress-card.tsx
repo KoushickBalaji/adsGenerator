@@ -17,16 +17,16 @@ const STATUS_COLORS: Record<VideoRun["status"], string> = {
 
 // Pipeline steps shown during processing
 const PIPELINE_STEPS = [
-  // Keep steps slow enough to feel "creative", not "stuck": ~30-60s per stage
-  { label: "Getting to know the piece", icon: "search", duration: 35000 },
-  { label: "Noticing the little details", icon: "gem", duration: 40000 },
-  { label: "Casting the muse", icon: "user", duration: 35000 },
-  { label: "Shaping the storyline", icon: "sparkle", duration: 40000 },
-  { label: "Setting the scene", icon: "layout", duration: 45000 },
+  // Timing goal: ~5 minutes total. Start fast (5-10s) then slow down in the middle.
+  { label: "Getting to know the piece", icon: "search", duration: 8000 },
+  { label: "Noticing the little details", icon: "gem", duration: 8000 },
+  { label: "Casting the muse", icon: "user", duration: 9000 },
+  { label: "Shaping the storyline", icon: "sparkle", duration: 45000 },
+  { label: "Setting the scene", icon: "layout", duration: 50000 },
   { label: "Capturing the moment", icon: "film", duration: 60000 },
   { label: "Bringing it to life", icon: "clapperboard", duration: 60000 },
-  { label: "Setting the mood lighting", icon: "sun", duration: 45000 },
-  { label: "Adding final touches", icon: "sparkles", duration: 45000 },
+  { label: "Setting the mood lighting", icon: "sun", duration: 30000 },
+  { label: "Adding final touches", icon: "sparkles", duration: 30000 },
 ];
 
 function StepIcon({ icon, className }: { icon: string; className?: string }) {
