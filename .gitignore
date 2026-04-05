@@ -26,3 +26,6 @@ Thumbs.db
 
 # Local-only element source assets (copied into frontend/public for Vercel hosting)
 Element Sources/
+
+# Local scratch (Codex sandbox cannot delete files)
+frontend/src/app/_delete_test.tmp
