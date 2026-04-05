@@ -46,6 +46,8 @@ const BROWSER_HEADERS: Record<string, string> = {
 // and can also be sent to Gemini as multimodal reference context.
 const MAX_REFERENCE_IMAGES = 12;
 
+export type ScraperAdapter = "bluestone" | "generic" | "shopify";
+
 /**
  * Extract the design ID from a BlueStone product URL.
  * Format: /category/product-name~DESIGN_ID.html
@@ -103,11 +105,31 @@ function extractDesignKeyFromCdnUrl(url: string): string | null {
 
 export async function scrapeProduct(
   url: string,
-  opts: { debug?: boolean } = {}
+  opts: {
+    debug?: boolean;
+    adapter?: ScraperAdapter;
+    maxReferenceImages?: number;
+  } = {}
 ): Promise<ProductData> {
+  const adapter: ScraperAdapter = opts.adapter ?? "bluestone";
+  const maxReferenceImages = Math.min(
+    20,
+    Math.max(1, opts.maxReferenceImages ?? MAX_REFERENCE_IMAGES)
+  );
+
   const cleanUrl = new URL(url);
   cleanUrl.search = "";
   const cleanUrlStr = cleanUrl.toString();
+
+  // Generic/product-only fallback path (no BlueStone internal API assumptions).
+  if (adapter !== "bluestone") {
+    const product = await scrapeFromHtml(cleanUrlStr, [], maxReferenceImages);
+    return {
+      ...product,
+      input_images: product.input_images.slice(0, maxReferenceImages),
+    };
+  }
+
   const designId = extractDesignId(cleanUrlStr);
 
   // Run both strategies in parallel:
@@ -153,7 +175,7 @@ export async function scrapeProduct(
   }
 
   // Full HTML fallback
-  const fallback = await scrapeFromHtml(cleanUrlStr, htmlImages);
+    const fallback = await scrapeFromHtml(cleanUrlStr, htmlImages, maxReferenceImages);
   return {
     ...fallback,
     ...(opts.debug
@@ -353,8 +375,8 @@ async function fetchGalleryMediaFromHtml(url: string): Promise<{
     // lifestyle shots (which can include other jewellery like extra rings/bracelets).
     const selected =
       productOnly.length > 0
-        ? productOnly.slice(0, MAX_REFERENCE_IMAGES)
-        : lifestyle.slice(0, MAX_REFERENCE_IMAGES);
+        ? productOnly.slice(0, maxReferenceImages)
+        : lifestyle.slice(0, maxReferenceImages);
     if (productOnly.length === 0 && lifestyle.length > 0) {
       console.warn(
         `[scrapeProduct] Only lifestyle/beauty images found for ${designKey}; using them as fallback.`
@@ -384,7 +406,11 @@ async function fetchGalleryMediaFromHtml(url: string): Promise<{
 
 // ─── Full HTML fallback (no API data) ───
 
-async function scrapeFromHtml(url: string, preloadedImages: string[]): Promise<ProductData> {
+async function scrapeFromHtml(
+  url: string,
+  preloadedImages: string[],
+  maxReferenceImages: number
+): Promise<ProductData> {
   const res = await fetch(url, {
     headers: BROWSER_HEADERS,
     redirect: "follow",
@@ -413,7 +439,7 @@ async function scrapeFromHtml(url: string, preloadedImages: string[]): Promise<P
           product_title: data.name,
           product_description: data.description || "",
           product_category: inferCategory(data.name, data.category || ""),
-          input_images: images.slice(0, MAX_REFERENCE_IMAGES),
+          input_images: images.slice(0, maxReferenceImages),
         };
       }
     } catch { /* skip */ }
@@ -430,17 +456,17 @@ async function scrapeFromHtml(url: string, preloadedImages: string[]): Promise<P
       product_title: ogTitle,
       product_description: ogDesc || "",
       product_category: inferCategory(ogTitle, ""),
-      input_images: images.slice(0, MAX_REFERENCE_IMAGES),
+      input_images: images.slice(0, maxReferenceImages),
     };
   }
 
   // Last resort
   if (preloadedImages.length > 0) {
     return {
-      product_title: "BlueStone Product",
+      product_title: "Product",
       product_description: "",
       product_category: extractCategoryFromUrl(url),
-      input_images: preloadedImages.slice(0, MAX_REFERENCE_IMAGES),
+      input_images: preloadedImages.slice(0, maxReferenceImages),
     };
   }
 

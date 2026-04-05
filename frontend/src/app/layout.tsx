@@ -8,8 +8,8 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "BlueStone Video Generator",
-  description: "Generate premium jewellery ad videos from product URLs",
+  title: "Jewellery Video Demo",
+  description: "Generate short jewellery ad videos from product URLs (demo)",
 };
 
 export default function RootLayout({

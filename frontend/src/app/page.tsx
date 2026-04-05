@@ -7,32 +7,47 @@ import { ProgressCard, ReferencePanel } from "@/components/progress-card";
 import { HistoryList } from "@/components/history-list";
 
 export default function Home() {
+  const companySlug = "bluestone";
   const [runs, setRuns] = useState<VideoRun[]>([]);
   const [activeRun, setActiveRun] = useState<VideoRun | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [demoKey, setDemoKey] = useState("");
+
+  const activeRunId = activeRun?.id ?? null;
+  const activeRunStatus = activeRun?.status ?? null;
 
   // Load history on mount
   useEffect(() => {
     loadHistory();
   }, []);
 
+  // Pull demo key from URL: /?key=...
+  useEffect(() => {
+    try {
+      const key = new URLSearchParams(window.location.search).get("key") ?? "";
+      setDemoKey(key);
+    } catch {
+      setDemoKey("");
+    }
+  }, []);
+
   // Subscribe to realtime updates on active run
   useEffect(() => {
-    if (!activeRun || activeRun.status === "completed" || activeRun.status === "failed") {
+    if (!activeRunId || activeRunStatus === "completed" || activeRunStatus === "failed") {
       return;
     }
 
     const channel = supabase
-      .channel(`run-${activeRun.id}`)
+      .channel(`run-${activeRunId}`)
       .on(
         "postgres_changes",
         {
           event: "UPDATE",
           schema: "public",
           table: "video_runs",
-          filter: `id=eq.${activeRun.id}`,
+          filter: `id=eq.${activeRunId}`,
         },
         (payload) => {
           const updated = payload.new as VideoRun;
@@ -47,24 +62,29 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeRun?.id, activeRun?.status]);
+  }, [activeRunId, activeRunStatus]);
 
   // Auto-poll every 15s when a run is processing (webhook fallback)
   useEffect(() => {
-    if (!activeRun || (activeRun.status !== "processing" && activeRun.status !== "queued")) {
+    if (
+      !demoKey ||
+      !activeRunId ||
+      (activeRunStatus !== "processing" && activeRunStatus !== "queued")
+    ) {
       return;
     }
 
     const poll = async () => {
       try {
         await supabase.functions.invoke("refresh-run", {
-          body: { runId: activeRun.id },
+          body: { runId: activeRunId, companySlug, demoKey },
         });
 
         const { data } = await supabase
           .from("video_runs")
           .select("*")
-          .eq("id", activeRun.id)
+          .eq("id", activeRunId)
+          .eq("company_slug", companySlug)
           .single();
 
         if (data) {
@@ -91,12 +111,13 @@ export default function Home() {
       clearTimeout(initialDelay);
       if (intervalRef) clearInterval(intervalRef);
     };
-  }, [activeRun?.id, activeRun?.status]);
+  }, [activeRunId, activeRunStatus, companySlug, demoKey]);
 
   async function loadHistory() {
     const { data } = await supabase
       .from("video_runs")
       .select("*")
+      .eq("company_slug", companySlug)
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -104,6 +125,11 @@ export default function Home() {
   }
 
   async function handleGenerate(url: string) {
+    if (!demoKey) {
+      setError("Invalid demo link. Reach out to the developer.");
+      return;
+    }
+
     setError("");
     setStarting(true);
 
@@ -117,6 +143,7 @@ export default function Home() {
     // without waiting for the Edge Function to finish all upstream calls.
     const optimisticRun: VideoRun = {
       id: optimisticRunId,
+      company_slug: companySlug,
       source_url: url,
       product_title: null,
       product_category: null,
@@ -137,7 +164,7 @@ export default function Home() {
 
     try {
       const res = await supabase.functions.invoke("create-run", {
-        body: { url, runId: optimisticRunId },
+        body: { url, runId: optimisticRunId, companySlug, demoKey },
       });
 
       if (res.error) {
@@ -159,6 +186,7 @@ export default function Home() {
         .from("video_runs")
         .select("*")
         .eq("id", effectiveRunId)
+        .eq("company_slug", companySlug)
         .single();
 
       if (run) {
@@ -229,18 +257,19 @@ export default function Home() {
   }
 
   const handleRefresh = useCallback(async () => {
-    if (!activeRun) return;
+    if (!demoKey || !activeRunId) return;
 
     try {
       await supabase.functions.invoke("refresh-run", {
-        body: { runId: activeRun.id },
+        body: { runId: activeRunId, companySlug, demoKey },
       });
 
       // Re-fetch the run
       const { data } = await supabase
         .from("video_runs")
         .select("*")
-        .eq("id", activeRun.id)
+        .eq("id", activeRunId)
+        .eq("company_slug", companySlug)
         .single();
 
       if (data) {
@@ -253,7 +282,7 @@ export default function Home() {
     } catch {
       // Silently fail — user can try again
     }
-  }, [activeRun]);
+  }, [activeRunId, companySlug, demoKey]);
 
   function handleSelectRun(run: VideoRun) {
     setActiveRun(run);
@@ -320,7 +349,7 @@ export default function Home() {
       <main className="flex min-h-0 flex-1 flex-col px-6 pt-4 pb-2">
         {/* Input */}
         <section className="mx-auto w-full max-w-4xl mb-3 flex-shrink-0">
-          <UrlInput onSubmit={handleGenerate} disabled={starting} />
+          <UrlInput onSubmit={handleGenerate} disabled={starting || !demoKey} />
           {error && (
             <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
               <svg className="mt-0.5 w-5 h-5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -361,7 +390,7 @@ export default function Home() {
             ) : (
               <div className="rounded-xl border border-dashed border-zinc-800 p-12 text-center">
                 <p className="text-zinc-500">
-                  Paste a BlueStone product URL to generate a video ad
+                  Paste a product URL to generate a video ad
                 </p>
               </div>
             )}

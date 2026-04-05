@@ -37,7 +37,7 @@ serve(async (req) => {
     // Find the run by provider_job_id
     const { data: run } = await supabase
       .from("video_runs")
-      .select("id")
+      .select("id, company_slug")
       .eq("provider_job_id", taskId)
       .single();
 
@@ -56,7 +56,12 @@ serve(async (req) => {
       const videoUrl = taskResult?.videos?.[0]?.url;
       if (videoUrl) {
         // Download and upload to Supabase Storage for stable hosting
-        outputVideoUrl = await uploadToStorage(supabase, run.id, videoUrl);
+        outputVideoUrl = await uploadToStorage(
+          supabase,
+          run.company_slug ?? "unknown",
+          run.id,
+          videoUrl
+        );
       }
     } else if (taskStatus === "failed") {
       status = "failed";
@@ -81,6 +86,7 @@ serve(async (req) => {
 
 async function uploadToStorage(
   supabase: ReturnType<typeof getServiceClient>,
+  companySlug: string,
   runId: string,
   videoUrl: string
 ): Promise<string> {
@@ -89,7 +95,8 @@ async function uploadToStorage(
     if (!res.ok) throw new Error(`Failed to download video: ${res.status}`);
 
     const blob = await res.blob();
-    const path = `${runId}.mp4`;
+    const safeCompanySlug = String(companySlug || "unknown").trim().toLowerCase();
+    const path = `${safeCompanySlug}/${runId}.mp4`;
 
     const { error } = await supabase.storage
       .from("generated-videos")

@@ -1,10 +1,12 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { getServiceClient } from "../_shared/supabase.ts";
 import { getTaskStatus } from "../_shared/kling.ts";
+import { assertDemoKey, getCompanyConfig, HttpError } from "../_shared/companyConfig.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-demo-key",
 };
 
 serve(async (req) => {
@@ -13,7 +15,26 @@ serve(async (req) => {
   }
 
   try {
-    const { runId } = await req.json();
+    let body: Record<string, unknown>;
+    try {
+      const text = await req.text();
+      if (!text.trim()) {
+        return jsonResponse({ error: "Missing JSON body" }, 400);
+      }
+      body = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+
+    const runId = body.runId;
+    const companySlug = typeof body.companySlug === "string" ? body.companySlug : "bluestone";
+
+    const config = getCompanyConfig(companySlug);
+    if (!config) {
+      return jsonResponse({ error: "Invalid demo link." }, 404);
+    }
+
+    assertDemoKey({ req, config, bodyDemoKey: body.demoKey });
 
     if (!runId) {
       return jsonResponse({ error: "Missing runId" }, 400);
@@ -26,6 +47,7 @@ serve(async (req) => {
       .from("video_runs")
       .select("*")
       .eq("id", runId)
+      .eq("company_slug", config.slug)
       .single();
 
     if (dbError || !run) {
@@ -52,7 +74,12 @@ serve(async (req) => {
       status = "completed";
       const videoUrl = task.task_result?.videos?.[0]?.url;
       if (videoUrl) {
-        outputVideoUrl = await uploadToStorage(supabase, run.id, videoUrl);
+        outputVideoUrl = await uploadToStorage(
+          supabase,
+          run.company_slug ?? config.slug,
+          run.id,
+          videoUrl
+        );
       }
     } else if (task.task_status === "failed") {
       status = "failed";
@@ -71,6 +98,9 @@ serve(async (req) => {
     return jsonResponse({ status });
   } catch (err) {
     console.error("refresh-run error:", err);
+    if (err instanceof HttpError) {
+      return jsonResponse({ error: err.message }, err.status);
+    }
     return jsonResponse(
       { error: err instanceof Error ? err.message : "Internal error" },
       500
@@ -80,6 +110,7 @@ serve(async (req) => {
 
 async function uploadToStorage(
   supabase: ReturnType<typeof getServiceClient>,
+  companySlug: string,
   runId: string,
   videoUrl: string
 ): Promise<string> {
@@ -88,7 +119,8 @@ async function uploadToStorage(
     if (!res.ok) throw new Error(`Failed to download video: ${res.status}`);
 
     const blob = await res.blob();
-    const path = `${runId}.mp4`;
+    const safeCompanySlug = String(companySlug || "unknown").trim().toLowerCase();
+    const path = `${safeCompanySlug}/${runId}.mp4`;
 
     const { error } = await supabase.storage
       .from("generated-videos")

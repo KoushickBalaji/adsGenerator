@@ -6,10 +6,6 @@
 const KLING_BASE_URL = (Deno.env.get("KLING_BASE_URL") ??
   "https://api-singapore.klingai.com").replace(/\/+$/, "");
 
-// Non-secret config: for this demo, ONLY use custom elements whose names start with this prefix.
-// This prevents accidentally selecting leftover test elements from the Kling account.
-export const BRAND_ELEMENT_NAME_PREFIX = "bluestone";
-
 // JWT token cache - reuse until close to expiry
 let cachedToken: string | null = null;
 let tokenExpiresAt = 0;
@@ -177,7 +173,7 @@ function parseJsonPreservingLargeIds(text: string): any {
 
 export function isElementNameEligible(
   name: string,
-  prefix = BRAND_ELEMENT_NAME_PREFIX
+  prefix: string
 ): boolean {
   const n = name.trim().toLowerCase();
   const p = prefix.trim().toLowerCase();
@@ -316,15 +312,15 @@ export async function deleteCustomElement(
 
 /** Pick a random CUSTOM element from the account */
 export async function getRandomElement(opts: {
-  namePrefix?: string;
-} = {}): Promise<KlingElement | null> {
+  namePrefix: string;
+}): Promise<KlingElement | null> {
   const elements = await listCustomElements();
   if (elements.length === 0) {
     console.warn("[getRandomElement] No custom elements found in Kling account");
     return null;
   }
 
-  const prefix = opts.namePrefix ?? BRAND_ELEMENT_NAME_PREFIX;
+  const prefix = opts.namePrefix;
   const eligible = elements.filter((e) => isElementNameEligible(e.name, prefix));
   if (eligible.length === 0) {
     console.warn(

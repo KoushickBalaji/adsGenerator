@@ -11,10 +11,10 @@ type Props = {
 export function HistoryList({ runs, onSelect, selectedId }: Props) {
   if (runs.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
         <p className="text-zinc-500">No videos generated yet.</p>
         <p className="mt-1 text-sm text-zinc-600">
-          Paste a BlueStone product URL above to get started.
+          Paste a product URL above to get started.
         </p>
       </div>
     );

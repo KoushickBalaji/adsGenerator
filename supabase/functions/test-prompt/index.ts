@@ -2,7 +2,6 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { scrapeProduct } from "../_shared/scraper.ts";
 import { generateKlingPromptWithGemini } from "../_shared/geminiPrompt.ts";
 import {
-  BRAND_ELEMENT_NAME_PREFIX,
   createCustomElement,
   deleteCustomElement,
   isElementNameEligible,
@@ -23,10 +22,12 @@ serve(async (req) => {
 
   try {
     // Utility mode: list Kling elements visible to the API credentials.
-    // Note: production only uses CUSTOM elements whose names start with BRAND_ELEMENT_NAME_PREFIX.
+    // Note: production filters custom elements by company-specific prefix candidates.
     // GET /functions/v1/test-prompt?mode=elements&kind=custom|preset|all&all=true&pageSize=100&maxPages=20
     const reqUrl = new URL(req.url);
     const mode = reqUrl.searchParams.get("mode");
+    const eligiblePrefix =
+      (reqUrl.searchParams.get("prefix") ?? "").trim() || "bluestone";
     if (req.method === "GET" && mode === "elements") {
       const kind = reqUrl.searchParams.get("kind") ?? "all";
       const allPages = reqUrl.searchParams.get("all") === "true";
@@ -73,7 +74,6 @@ serve(async (req) => {
             : await listPresetElements(pageNum, pageSize)
           : undefined;
 
-      const eligiblePrefix = BRAND_ELEMENT_NAME_PREFIX;
       const withEligibility = <T extends { id: string; name: string }>(elements: T[]) =>
         elements.map((e) => ({
           ...e,
@@ -267,11 +267,11 @@ serve(async (req) => {
           validationErrors.push({ index: i, error: "Missing element name" });
           continue;
         }
-        if (!isElementNameEligible(name, BRAND_ELEMENT_NAME_PREFIX)) {
+        if (!isElementNameEligible(name, eligiblePrefix)) {
           validationErrors.push({
             index: i,
             name,
-            error: `Element name must start with "${BRAND_ELEMENT_NAME_PREFIX}"`,
+            error: `Element name must start with "${eligiblePrefix}"`,
           });
           continue;
         }
@@ -349,7 +349,7 @@ serve(async (req) => {
         return json(
           {
             error: "Validation failed",
-            eligible_prefix: BRAND_ELEMENT_NAME_PREFIX,
+            eligible_prefix: eligiblePrefix,
             assets_base_url: assetsBaseUrl.toString(),
             details: validationErrors,
           },
@@ -396,7 +396,7 @@ serve(async (req) => {
       return json(
         {
           mode: "elements-create",
-          eligible_prefix: BRAND_ELEMENT_NAME_PREFIX,
+          eligible_prefix: eligiblePrefix,
           assets_base_url: assetsBaseUrl.toString(),
           dry_run: dryRun,
           results,
@@ -448,7 +448,7 @@ serve(async (req) => {
       const prefix =
         typeof body.prefix === "string" && body.prefix.trim().length > 0
           ? body.prefix.trim()
-          : BRAND_ELEMENT_NAME_PREFIX;
+          : "bluestone";
 
       const ids = Array.isArray(body.ids)
         ? body.ids.map((x) => String(x).trim()).filter(Boolean)

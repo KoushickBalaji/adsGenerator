@@ -4,15 +4,20 @@ import { scrapeProduct } from "../_shared/scraper.ts";
 import {
   createOmniVideo,
   getRandomElement,
-  BRAND_ELEMENT_NAME_PREFIX,
   isElementNameEligible,
 } from "../_shared/kling.ts";
 import { generateKlingPromptWithGemini } from "../_shared/geminiPrompt.ts";
+import {
+  assertDemoKey,
+  assertUrlAllowed,
+  getCompanyConfig,
+  HttpError,
+} from "../_shared/companyConfig.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-demo-key",
 };
 
 serve(async (req) => {
@@ -25,30 +30,35 @@ serve(async (req) => {
   let createdProviderJobId: string | null = null;
 
   try {
-    // Non-secret config: hardcode the Kling model(s) for this demo.
-    // We'll try the preferred model first, then fall back if Kling rejects it as invalid.
-    const KLING_MODEL_CANDIDATES = ["kling-v3-omni", "kling-v3"] as const;
+    let body: Record<string, unknown>;
+    try {
+      const text = await req.text();
+      if (!text.trim()) {
+        return jsonResponse({ error: "Missing JSON body" }, 400);
+      }
+      body = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
 
-    const { url, runId } = await req.json();
+    const url = body.url;
+    const runId = body.runId;
+    const companySlug = typeof body.companySlug === "string" ? body.companySlug : "bluestone";
+
+    const config = getCompanyConfig(companySlug);
+    if (!config) {
+      return jsonResponse({ error: "Invalid demo link." }, 404);
+    }
+
+    // Gate early (before any costly work).
+    assertDemoKey({ req, config, bodyDemoKey: body.demoKey });
 
     // Validate URL
     if (!url || typeof url !== "string") {
       return jsonResponse({ error: "Missing url" }, 400);
     }
 
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return jsonResponse({ error: "Invalid URL" }, 400);
-    }
-
-    if (!parsed.hostname.includes("bluestone.com")) {
-      return jsonResponse(
-        { error: "Only BlueStone URLs are supported" },
-        400
-      );
-    }
+    assertUrlAllowed(url, config);
 
     // Step 0: Cleanup stale active runs so they don't permanently block new generations
     // (e.g. if a webhook never arrives or a provider request failed after DB insert).
@@ -74,16 +84,52 @@ serve(async (req) => {
       .eq("status", "processing")
       .lt("created_at", processingCutoffIso);
 
+    // Step 1: Lifetime credits cap (success = mp4 created + URL recorded on the run)
+    const { count: successCount, error: successCountError } = await supabase
+      .from("video_runs")
+      .select("id", { count: "exact", head: true })
+      .eq("company_slug", config.slug)
+      .eq("status", "completed")
+      .not("output_video_url", "is", null);
+
+    if (successCountError) {
+      console.warn("[step 1] Could not check success count:", successCountError);
+    } else if ((successCount ?? 0) >= config.limits.maxLifetimeSuccessfulVideos) {
+      return jsonResponse(
+        { error: "You have run out of demo credits. Reach out to the developer." },
+        403
+      );
+    }
+
+    // Step 2: Optional attempt throttle (protects against repeated failures / link sharing)
+    if (typeof config.limits.maxAttemptsPerDay === "number") {
+      const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count: attemptCount, error: attemptCountError } = await supabase
+        .from("video_runs")
+        .select("id", { count: "exact", head: true })
+        .eq("company_slug", config.slug)
+        .gte("created_at", sinceIso);
+
+      if (attemptCountError) {
+        console.warn("[step 2] Could not check attempt count:", attemptCountError);
+      } else if ((attemptCount ?? 0) >= config.limits.maxAttemptsPerDay) {
+        return jsonResponse(
+          { error: "Too many attempts for this demo right now. Reach out to the developer." },
+          429
+        );
+      }
+    }
+
     // Step 1: Basic concurrency guard (keep UX simple; no explicit limit in the UI)
-    const MAX_CONCURRENT_RUNS = 3;
     const { count: activeCount, error: countError } = await supabase
       .from("video_runs")
       .select("id", { count: "exact", head: true })
+      .eq("company_slug", config.slug)
       .in("status", ["queued", "processing"]);
 
     if (countError) {
       console.warn("[step 0] Could not check active runs count:", countError);
-    } else if ((activeCount ?? 0) >= MAX_CONCURRENT_RUNS) {
+    } else if ((activeCount ?? 0) >= config.limits.maxConcurrentRuns) {
       return jsonResponse(
         { error: "We're a bit busy right now. Please try again in a few minutes." },
         429
@@ -95,6 +141,7 @@ serve(async (req) => {
     const insertPayload: Record<string, unknown> = {
       source_url: url,
       status: "processing",
+      company_slug: config.slug,
     };
     if (typeof runId === "string" && isUuid(runId)) {
       insertPayload.id = runId;
@@ -110,32 +157,46 @@ serve(async (req) => {
     insertedRunId = run.id;
 
     // Step 3: Scrape product data
-    const product = await scrapeProduct(url);
+    const product = await scrapeProduct(url, {
+      adapter: config.scraper.adapter,
+      maxReferenceImages: config.scraper.maxReferenceImages,
+    });
     console.log(
       `[step 3] Scraped: "${product.product_title}", ${product.input_images.length} images`
     );
 
     // Step 4: Fetch a random brand ambassador element - required
-    const element = await getRandomElement({
-      namePrefix: BRAND_ELEMENT_NAME_PREFIX,
-    });
-    if (!element) {
-      throw new Error(
-        `No eligible brand ambassador elements found. Please create a custom Kling element whose name starts with "${BRAND_ELEMENT_NAME_PREFIX}" (e.g. "${BRAND_ELEMENT_NAME_PREFIX}-anya"), then try again.`
-      );
+    let element: Awaited<ReturnType<typeof getRandomElement>> | null = null;
+    let pickedPrefix: string | null = null;
+
+    if (config.kling.ambassador.enabled) {
+      const prefixes = config.kling.ambassador.elementPrefixCandidates ?? [];
+      if (prefixes.length === 0) {
+        throw new Error(
+          `No eligible model persona configured for ${config.slug}. prefixes: (empty)`
+        );
+      }
+      pickedPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+      element = await getRandomElement({ namePrefix: pickedPrefix });
+      if (!element) {
+        throw new Error(
+          `No eligible model persona configured for ${config.slug}. prefixes: ${prefixes.join(", ")}`
+        );
+      }
+      // Defensive: should never happen because getRandomElement filters, but keep a hard guardrail.
+      if (!isElementNameEligible(element.name, pickedPrefix)) {
+        throw new Error(
+          `Selected element "${element.name}" is not eligible. Expected name to start with "${pickedPrefix}".`
+        );
+      }
+      console.log(`[step 4] Model persona: ${element.name} (${element.id})`);
     }
-    // Defensive: should never happen because getRandomElement filters, but keep a hard guardrail.
-    if (!isElementNameEligible(element.name, BRAND_ELEMENT_NAME_PREFIX)) {
-      throw new Error(
-        `Selected element "${element.name}" is not eligible. Expected name to start with "${BRAND_ELEMENT_NAME_PREFIX}".`
-      );
-    }
-    console.log(`[step 4] Ambassador: ${element.name} (${element.id})`);
 
     // Step 5: Generate prompt (always includes <<<element_1>>> + <<<image_1>>>...)
     const { prompt, request } = await generateKlingPromptWithGemini(
       product,
-      product.input_images.length
+      product.input_images.length,
+      config.prompt
     );
     console.log(`[step 5] Prompt: ${prompt}`);
     console.log(
@@ -167,7 +228,7 @@ serve(async (req) => {
 
     const imgs = request.productImageUrls;
     console.log(
-      `[step 7] Kling model candidates: ${KLING_MODEL_CANDIDATES.join(", ")}`
+      `[step 7] Kling model candidates: ${config.kling.modelCandidates.join(", ")}`
     );
     const imageList = imgs.slice(0, 3).map((imageUrl) => ({
       image_url: imageUrl,
@@ -178,17 +239,17 @@ serve(async (req) => {
       | null = null;
     let lastError: unknown = null;
 
-    for (const modelName of KLING_MODEL_CANDIDATES) {
+    for (const modelName of config.kling.modelCandidates) {
       try {
         console.log(`[step 7] Trying Kling model: ${modelName}`);
         klingRes = await createOmniVideo({
           model_name: modelName,
           prompt,
           image_list: imageList,
-          element_list: [{ element_id: element.id }],
-          duration: "10",
-          aspect_ratio: "1:1",
-          mode: "pro",
+          ...(element ? { element_list: [{ element_id: element.id }] } : {}),
+          duration: config.kling.defaults.duration,
+          aspect_ratio: config.kling.defaults.aspectRatio,
+          mode: config.kling.defaults.mode,
           callback_url: webhookUrl,
         });
         console.log(`[step 7] Using Kling model: ${modelName}`);
@@ -228,6 +289,10 @@ serve(async (req) => {
     return jsonResponse({ runId: run.id });
   } catch (err) {
     console.error("create-run error:", err);
+
+    if (err instanceof HttpError) {
+      return jsonResponse({ error: err.message }, err.status);
+    }
     const raw = err instanceof Error ? err.message : String(err);
     const friendly = toFriendlyError(raw);
 
@@ -261,11 +326,11 @@ function toFriendlyError(raw: string): string {
   if (lower.includes("kling_access_key") || lower.includes("kling_secret_key"))
     return "Video generation service is being configured. Please try again shortly.";
 
-  if (lower.includes("no eligible brand ambassador") || lower.includes("no brand ambassador"))
-    return `No eligible brand ambassador is configured yet. Please create a custom Kling element whose name starts with "${BRAND_ELEMENT_NAME_PREFIX}" and try again.`;
+  if (lower.includes("no eligible model persona") || lower.includes("no eligible persona"))
+    return "No eligible model persona is configured for this demo yet. Reach out to the developer.";
 
   if (lower.includes("kling elements api"))
-    return "We couldn't load the brand ambassador library. Please try again.";
+    return "We couldn't load the model persona library. Please try again.";
 
   if (lower.includes("model_name") && lower.includes("invalid"))
     return "Video model configuration is invalid. Please update the model setting and try again.";
@@ -286,7 +351,7 @@ function toFriendlyError(raw: string): string {
     return "We're generating too many videos right now. Please wait a moment and try again.";
 
   if (lower.includes("element id not found"))
-    return "We couldn't find the selected brand ambassador in Kling. Please try again.";
+    return "We couldn't find the selected model persona in Kling. Please try again.";
 
   if (lower.includes("kling"))
     return "Video generation service encountered an issue. Please try again.";
@@ -295,10 +360,7 @@ function toFriendlyError(raw: string): string {
     return "We couldn't read that product page. Please check the URL and try again.";
 
   if (lower.includes("invalid url") || lower.includes("missing url"))
-    return "Please enter a valid BlueStone product URL.";
-
-  if (lower.includes("only bluestone"))
-    return "This tool works exclusively with BlueStone product URLs.";
+    return "Please enter a valid product URL.";
 
   // Catch-all - never expose raw internals
   return "Something unexpected happened. Please try again.";

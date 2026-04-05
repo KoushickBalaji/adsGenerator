@@ -1,3 +1,15 @@
+export type PromptStyle = "jewellery_businesswoman_v1" | "product_only_v1";
+
+export type PromptPolicy = {
+  requiresAmbassador: boolean;
+  style: PromptStyle;
+};
+
+export const DEFAULT_PROMPT_POLICY: PromptPolicy = {
+  requiresAmbassador: true,
+  style: "jewellery_businesswoman_v1",
+};
+
 export type ProductForPrompt = {
   product_title: string;
   product_description: string;
@@ -195,11 +207,40 @@ function getJewellerySpec(
   }
 }
 
+function getProductOnlyJewellerySpec(
+  categoryRaw: string,
+  imageRefStr: string
+): JewellerySpec {
+  const base = getJewellerySpec(categoryRaw, imageRefStr);
+
+  return {
+    ...base,
+    shot1WornText: `the ${base.noun} shown in (refs: ${imageRefStr})`,
+    shot2WornText: `the same ${base.noun}`,
+    visibilityAnchor: "the product (fully visible and unobstructed)",
+    placement: { centered: true },
+    framingHint: "studio product framing; keep the entire item in frame; no hands/models",
+    exampleActionShot1:
+      "slow camera orbit / turntable spin around the product; subtle parallax; no props",
+    exampleActionShot2:
+      "macro detail glide then a gentle pull-back to a clean hero framing; controlled movement",
+    visibilityRules: [
+      `show exactly one ${base.noun}; no other jewellery`,
+      "no humans, hands, faces, or mannequins",
+      "no text, logos, watermarks, price tags, or UI overlays",
+      "keep the product fully visible; avoid extreme crop",
+    ],
+    propObstructionExample:
+      "avoid props that obstruct the product; keep the background clean and minimal",
+  };
+}
+
 export type GeminiKlingPromptRequest = {
   model: string;
   generationConfig: Record<string, unknown>;
   systemPrompt: string;
   userMessage: string;
+  policy: PromptPolicy;
   imageRefs: string[];
   productImageUrls: string[];
   geminiImageContext: GeminiImageContext[];
@@ -344,7 +385,8 @@ async function selectBestThreeImagesWithGemini(opts: {
 
 export function buildGeminiKlingPromptRequest(
   product: ProductForPrompt,
-  imageCount: number
+  imageCount: number,
+  policy: PromptPolicy = DEFAULT_PROMPT_POLICY
 ): GeminiKlingPromptRequest {
   const productImageUrls = Array.isArray(product.input_images)
     ? product.input_images
@@ -357,78 +399,145 @@ export function buildGeminiKlingPromptRequest(
     (_, i) => `<<<image_${i + 1}>>>`
   );
   const imageRefStr = imageRefs.join(", ");
-  const jewellery = getJewellerySpec(product.product_category, imageRefStr);
+  const effectivePolicy: PromptPolicy =
+    policy.style === "product_only_v1"
+      ? { ...policy, requiresAmbassador: false }
+      : policy;
 
-  const elementTokenLine =
-    "- <<<element_1>>> = the brand ambassador (a real person who will appear in the video)";
-  const ambassadorRuleLine = "- You MUST use <<<element_1>>> at least once.";
-  const storyboardAmbassadorLine =
-    "- Use <<<element_1>>> naturally in the story (not \"presenting\" the jewellery).";
-  const goodExampleShot1 = `Shot 1 (0-5s): ${JSON.stringify({
-    ambassador: "<<<element_1>>>",
-    scene: {
-      setting: "bright home office, rehearsing a presentation with a laptop and notes",
-      time_of_day: "early morning",
-      mood: "calm, focused, quietly confident",
-    },
-    wardrobe: {
-      top: "silk button-down blouse (fully opaque, modest neckline)",
-      bottom: "tailored charcoal trousers",
-      layer: "structured blazer",
-      colors: ["ivory", "charcoal"],
-    },
-    jewellery: {
-      worn_text: jewellery.shot1WornText,
-      size_cue: jewellery.sizeCue,
-      type: jewellery.kind,
-      count: 1,
-      placement: jewellery.placement,
-      no_other_jewellery: true,
-    },
-    camera: {
-      shot: "medium close-up",
-      movement: "gentle push-in",
-      framing: jewellery.framingHint,
-    },
-    action: jewellery.exampleActionShot1,
-    visibility_rules: jewellery.visibilityRules,
-    lighting: "soft natural window light with realistic metal reflections",
-    composition:
-      "clean, premium lifestyle framing that prioritizes her face/story; jewellery stays secondary",
-  })}`;
-  const goodExampleShot2 = `Shot 2 (5-10s): ${JSON.stringify({
-    ambassador: "<<<element_1>>>",
-    continuity: {
-      same_outfit_as_shot_1: true,
-      same_jewellery_as_shot_1: true,
-    },
-    scene: {
-      setting: "glass-walled meeting room, mid-morning",
-      mood: "composed, quietly powerful, warmly human",
-    },
-    jewellery: {
-      worn_text: jewellery.shot2WornText,
-      type: jewellery.kind,
-      count: 1,
-      placement: jewellery.placement,
-      no_other_jewellery: true,
-    },
-    camera: {
-      shot: "medium-close lifestyle",
-      movement: "slow push-in",
-      depth_of_field: "shallow but keeps face + jewellery visible",
-    },
-    action: jewellery.exampleActionShot2,
-    visibility_rules: [
-      ...jewellery.visibilityRules,
-      `keep ${jewellery.visibilityAnchor} visible for the full shot`,
-    ],
-    lighting: "clean, flattering office light with gentle reflections",
-    composition:
-      "serene framing with a little negative space for an end card (do not mention text/logos)",
-  })}`;
+  const jewellery =
+    effectivePolicy.requiresAmbassador
+      ? getJewellerySpec(product.product_category, imageRefStr)
+      : getProductOnlyJewellerySpec(product.product_category, imageRefStr);
 
-  const systemPrompt = `You write Kling AI video prompts for a luxury jewellery ad featuring a human subject (brand ambassador).
+  const wantsAmbassador = effectivePolicy.requiresAmbassador;
+
+  const elementTokenLine = wantsAmbassador
+    ? "- <<<element_1>>> = the model persona (a person who will appear in the video)"
+    : "";
+  const ambassadorRuleLine = wantsAmbassador
+    ? "- You MUST use <<<element_1>>> at least once."
+    : "";
+  const storyboardAmbassadorLine = wantsAmbassador
+    ? "- Use <<<element_1>>> naturally in the story (not \"presenting\" the jewellery)."
+    : "";
+
+  const goodExampleShot1 = wantsAmbassador
+    ? `Shot 1 (0-5s): ${JSON.stringify({
+        ambassador: "<<<element_1>>>",
+        scene: {
+          setting: "bright home office, rehearsing a presentation with a laptop and notes",
+          time_of_day: "early morning",
+          mood: "calm, focused, quietly confident",
+        },
+        wardrobe: {
+          top: "silk button-down blouse (fully opaque, modest neckline)",
+          bottom: "tailored charcoal trousers",
+          layer: "structured blazer",
+          colors: ["ivory", "charcoal"],
+        },
+        jewellery: {
+          worn_text: jewellery.shot1WornText,
+          size_cue: jewellery.sizeCue,
+          type: jewellery.kind,
+          count: 1,
+          placement: jewellery.placement,
+          no_other_jewellery: true,
+        },
+        camera: {
+          shot: "medium close-up",
+          movement: "gentle push-in",
+          framing: jewellery.framingHint,
+        },
+        action: jewellery.exampleActionShot1,
+        visibility_rules: jewellery.visibilityRules,
+        lighting: "soft natural window light with realistic metal reflections",
+        composition:
+          "clean, premium lifestyle framing that prioritizes her face/story; jewellery stays secondary",
+      })}`
+    : `Shot 1 (0-5s): ${JSON.stringify({
+        scene: {
+          setting: "premium studio cyclorama, clean gradient backdrop",
+          mood: "quietly premium, modern, minimal",
+        },
+        jewellery: {
+          worn_text: jewellery.shot1WornText,
+          type: jewellery.kind,
+          count: 1,
+          placement: jewellery.placement,
+          no_other_jewellery: true,
+        },
+        camera: {
+          shot: "product hero",
+          movement: "slow camera orbit / turntable spin",
+          depth_of_field: "shallow with the product kept sharp",
+        },
+        action: jewellery.exampleActionShot1,
+        visibility_rules: jewellery.visibilityRules,
+        lighting: "controlled studio lighting with realistic metal reflections",
+        composition:
+          "single product only; clean framing; no text/logos; premium studio film look",
+      })}`;
+
+  const goodExampleShot2 = wantsAmbassador
+    ? `Shot 2 (5-10s): ${JSON.stringify({
+        ambassador: "<<<element_1>>>",
+        continuity: {
+          same_outfit_as_shot_1: true,
+          same_jewellery_as_shot_1: true,
+        },
+        scene: {
+          setting: "glass-walled meeting room, mid-morning",
+          mood: "composed, quietly powerful, warmly human",
+        },
+        jewellery: {
+          worn_text: jewellery.shot2WornText,
+          type: jewellery.kind,
+          count: 1,
+          placement: jewellery.placement,
+          no_other_jewellery: true,
+        },
+        camera: {
+          shot: "medium-close lifestyle",
+          movement: "slow push-in",
+          depth_of_field: "shallow but keeps face + jewellery visible",
+        },
+        action: jewellery.exampleActionShot2,
+        visibility_rules: [
+          ...jewellery.visibilityRules,
+          `keep ${jewellery.visibilityAnchor} visible for the full shot`,
+        ],
+        lighting: "clean, flattering office light with gentle reflections",
+        composition:
+          "serene framing with a little negative space for an end card (do not mention text/logos)",
+      })}`
+    : `Shot 2 (5-10s): ${JSON.stringify({
+        continuity: {
+          same_jewellery_as_shot_1: true,
+        },
+        scene: {
+          setting: "premium studio cyclorama, slightly darker gradient backdrop",
+          mood: "confident, minimal, premium",
+        },
+        jewellery: {
+          worn_text: jewellery.shot2WornText,
+          type: jewellery.kind,
+          count: 1,
+          placement: jewellery.placement,
+          no_other_jewellery: true,
+        },
+        camera: {
+          shot: "detail pass + hero hold",
+          movement: "macro glide then gentle pull-back",
+          depth_of_field: "shallow but keeps the full product readable",
+        },
+        action: jewellery.exampleActionShot2,
+        visibility_rules: jewellery.visibilityRules,
+        lighting: "controlled highlights; soft shadows; realistic reflections",
+        composition:
+          "serene framing with a little negative space for an end card (do not mention text/logos)",
+      })}`;
+
+  const systemPromptAmbassador = `You write Kling AI video prompts for a luxury jewellery ad featuring a human subject (model persona).
 
 You MUST use these special reference tokens in your output - they map to real images/people in the video:
 ${elementTokenLine}
@@ -502,16 +611,57 @@ DO NOT:
 - Write generic luxury cliches ("glamorous gala", "red carpet", "shimmering under lights")
 - Use markdown/code fences or explanations - output ONLY the raw prompt
 
+  GOOD EXAMPLE (uses all available image tokens):
+  ${goodExampleShot1}
+  ${goodExampleShot2}`;
+
+  const systemPromptProductOnly = `You write Kling AI video prompts for a premium studio product film (product-only, no humans).
+
+You MUST use these special reference tokens in your output - they map to real images in the video:
+- ${imageRefs.map((ref, i) => `${ref} = product photo angle ${i + 1}`).join("\n- ")}
+
+MANDATORY:
+- Do NOT use <<<element_1>>> in the prompt (no model persona for this mode).
+- You MUST use EVERY available image token: ${imageRefStr}. Each token is a different view of the SAME piece (different angles/poses) - use them as continuity anchors. NEVER imply the jewellery changes across tokens or between shots.
+- You may receive additional reference photos beyond the ${imageRefStr} tokens. Treat them as extra views of the SAME piece; do not mention or imply differences.
+- Avoid wording that makes the tokens sound like different jewellery pieces. DO NOT write phrases like "from <<<image_1>>> and <<<image_2>>>" or "details matching <<<image_3>>>".
+- BEST PRACTICE: define the jewellery ONCE using ALL image tokens together, e.g. "${jewellery.shot1WornText}". After that, refer only to "${jewellery.shot2WornText}" (no new ref tokens in later mentions).
+- Show exactly ONE referenced piece (count = 1) and avoid any other jewellery.
+- Product-only: no humans, hands, faces, mannequins, or worn/lifestyle shots.
+- No text overlays, voiceover, music, logos, titles, or sound.
+
+KLING MULTI-SHOT STORYBOARD (JSON STRUCTURE):
+- Write a TWO-SHOT storyboard for ~10s total, 1:1 (square).
+- Include BOTH shot headings exactly as:
+  Shot 1 (0-5s): ...
+  Shot 2 (5-10s): ...
+- After each heading, output a SINGLE valid JSON object (double quotes, no trailing commas, no comments).
+- The JSON can be multi-line, but it must be valid JSON.
+- Do NOT wrap the output in Markdown/code fences. Output ONLY the raw storyboard text.
+- Keep the output compact: total output must be <= ${KLING_PROMPT_TARGET_MAX_CHARS} characters (Kling hard limit is ${KLING_PROMPT_MAX_CHARS}). Minify JSON (no extra whitespace) and keep string values short.
+- In Shot 1 JSON, include a jewellery field like:
+  "jewellery": { "worn_text": "${jewellery.shot1WornText}", ... }
+- In Shot 2 JSON, set "jewellery.worn_text" to exactly "${jewellery.shot2WornText}" and DO NOT include any image ref tokens in Shot 2.
+- Use ALL image tokens at least once in the overall prompt. Prefer to include ALL tokens together in Shot 1 when first defining the jewellery. In Shot 2, refer to "${jewellery.shot2WornText}" without introducing new ref tokens.
+- Premium studio product film: slow camera orbit, controlled lighting, shallow DOF, realistic metal reflections.
+
+DO NOT:
+- Mention text overlays, voiceover, music, logos, titles, or sound
+- Include humans, hands, faces, mannequins, or lifestyle scenes
+- Use markdown/code fences or explanations - output ONLY the raw prompt
+
 GOOD EXAMPLE (uses all available image tokens):
 ${goodExampleShot1}
 ${goodExampleShot2}`;
 
-  const userMessage = `Write a Kling video prompt for:
+  const systemPrompt = wantsAmbassador ? systemPromptAmbassador : systemPromptProductOnly;
+
+  const userMessageAmbassador = `Write a Kling video prompt for:
 Product: ${product.product_title}
 Category: ${product.product_category}
 Description: ${product.product_description}
 
-The ambassador is <<<element_1>>>. The product images are: ${imageRefStr}.
+The model persona is <<<element_1>>>. The product images are: ${imageRefStr}.
 You MUST use every single one of these tokens in your prompt.
 In Shot 1 JSON, set jewellery.worn_text to exactly: "${jewellery.shot1WornText}".
 In Shot 2 JSON, set jewellery.worn_text to exactly: "${jewellery.shot2WornText}" (do not include any ${imageRefStr} tokens in Shot 2).
@@ -524,11 +674,32 @@ Shot 1 (0-5s): ...
 Shot 2 (5-10s): ...
 (~10s total, 1:1). Keep the TOTAL OUTPUT under ${KLING_PROMPT_TARGET_MAX_CHARS} characters (Kling hard limit is ${KLING_PROMPT_MAX_CHARS}). The JSON should include keys like scene, wardrobe, jewellery, camera, action, visibility_rules, lighting, composition. Do not add extra shots.`;
 
+  const userMessageProductOnly = `Write a Kling video prompt for:
+Product: ${product.product_title}
+Category: ${product.product_category}
+Description: ${product.product_description}
+
+The product images are: ${imageRefStr}.
+You MUST use every single one of these tokens in your prompt.
+In Shot 1 JSON, set jewellery.worn_text to exactly: "${jewellery.shot1WornText}".
+In Shot 2 JSON, set jewellery.worn_text to exactly: "${jewellery.shot2WornText}" (do not include any ${imageRefStr} tokens in Shot 2).
+In Shot 1 JSON, include jewellery.size_cue with an approximate real-world measurement based on the reference photos (mm/cm + optional inches), kept short (e.g., "pendant ~18mm (0.7in)").
+
+Creative direction: premium studio product film. Slow camera orbit, controlled lighting, shallow depth of field, realistic metal reflections. No humans, hands, faces, mannequins, worn shots, or lifestyle scenes.
+
+Output a TWO-SHOT storyboard using these headings, with ONE JSON object after each heading:
+Shot 1 (0-5s): ...
+Shot 2 (5-10s): ...
+(~10s total, 1:1). Keep the TOTAL OUTPUT under ${KLING_PROMPT_TARGET_MAX_CHARS} characters (Kling hard limit is ${KLING_PROMPT_MAX_CHARS}). The JSON should include keys like scene, jewellery, camera, action, visibility_rules, lighting, composition. Do not add extra shots.`;
+
+  const userMessage = wantsAmbassador ? userMessageAmbassador : userMessageProductOnly;
+
   return {
     model: GEMINI_MODEL,
     generationConfig: { ...GEMINI_GENERATION_CONFIG },
     systemPrompt,
     userMessage,
+    policy: effectivePolicy,
     imageRefs,
     productImageUrls,
     geminiImageContext: [],
@@ -576,7 +747,8 @@ async function imageUrlToGeminiInlineDataPart(
 
 export async function generateKlingPromptWithGemini(
   product: ProductForPrompt,
-  imageCount: number
+  imageCount: number,
+  policy: PromptPolicy = DEFAULT_PROMPT_POLICY
 ): Promise<{
   prompt: string;
   request: GeminiKlingPromptRequest;
@@ -662,7 +834,8 @@ export async function generateKlingPromptWithGemini(
 
   const request = buildGeminiKlingPromptRequest(
     orderedProduct,
-    orderedUrls.length || imageCount
+    orderedUrls.length || imageCount,
+    policy
   );
 
   // Build product image parts once so we can retry without refetching images.
@@ -778,8 +951,14 @@ export async function generateKlingPromptWithGemini(
   }
 
   // Safety check: if Gemini somehow omitted the required tokens, fail loudly
-  if (!prompt.includes("<<<element_1>>>")) {
-    throw new Error(`Generated prompt missing <<<element_1>>>: "${prompt}"`);
+  if (request.policy.requiresAmbassador) {
+    if (!prompt.includes("<<<element_1>>>")) {
+      throw new Error(`Generated prompt missing <<<element_1>>>: "${prompt}"`);
+    }
+  } else if (prompt.includes("<<<element_1>>>")) {
+    throw new Error(
+      `Generated prompt unexpectedly includes <<<element_1>>> in product-only mode: "${prompt}"`
+    );
   }
   const missingImageTokens = request.imageRefs.filter((ref) => !prompt.includes(ref));
   if (missingImageTokens.length > 0) {

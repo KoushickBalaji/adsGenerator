@@ -7,6 +7,7 @@ export const supabase = createClient(supabaseUrl || "http://localhost", supabase
 
 export type VideoRun = {
   id: string;
+  company_slug: string;
   source_url: string;
   product_title: string | null;
   product_category: string | null;
