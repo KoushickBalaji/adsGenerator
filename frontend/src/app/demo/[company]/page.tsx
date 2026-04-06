@@ -11,9 +11,10 @@ export default async function Page({
 }) {
   const { company } = await params;
   const sp = await searchParams;
-  const keyRaw = sp.key;
-  const demoKey = Array.isArray(keyRaw) ? keyRaw[0] : keyRaw;
+  const urlRaw = sp.url;
+  const initialUrl = Array.isArray(urlRaw) ? urlRaw[0] : urlRaw;
+  const autostartRaw = sp.autostart;
+  const autostart = (Array.isArray(autostartRaw) ? autostartRaw[0] : autostartRaw) === "1";
 
-  return <DemoClient companySlug={company} demoKey={demoKey ?? ""} />;
+  return <DemoClient companySlug={company} initialUrl={initialUrl ?? ""} autostart={autostart} />;
 }
-

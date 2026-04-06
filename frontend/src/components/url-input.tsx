@@ -7,10 +7,11 @@ type Props = {
   disabled: boolean;
   placeholder?: string;
   helperText?: string;
+  initialValue?: string;
 };
 
-export function UrlInput({ onSubmit, disabled, placeholder, helperText }: Props) {
-  const [url, setUrl] = useState("");
+export function UrlInput({ onSubmit, disabled, placeholder, helperText, initialValue }: Props) {
+  const [url, setUrl] = useState(initialValue || "");
   const [error, setError] = useState("");
 
   function handleSubmit(e: React.FormEvent) {

@@ -8,7 +8,6 @@ import {
 } from "../_shared/kling.ts";
 import { generateKlingPromptWithGemini } from "../_shared/geminiPrompt.ts";
 import {
-  assertDemoKey,
   assertUrlAllowed,
   getCompanyConfig,
   HttpError,
@@ -17,7 +16,7 @@ import {
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-demo-key",
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -49,9 +48,6 @@ serve(async (req) => {
     if (!config) {
       return jsonResponse({ error: "Invalid demo link." }, 404);
     }
-
-    // Gate early (before any costly work).
-    assertDemoKey({ req, config, bodyDemoKey: body.demoKey });
 
     // Validate URL
     if (!url || typeof url !== "string") {

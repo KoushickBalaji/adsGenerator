@@ -1,10 +1,10 @@
-Multi-Company Demo Mode Spec (adsGenerator)
+﻿Multi-Company Demo Mode Spec (adsGenerator)
 
 Goal
 
 
 
-Enable one shared UI to demo multiple companies safely and cleanly, without duplicating pages, while keeping the codebase maintainable and avoiding “if company === …” sprawl.
+Enable one shared UI to demo multiple companies safely and cleanly, without duplicating pages, while keeping the codebase maintainable and avoiding â€œif company === â€¦â€ sprawl.
 
 
 
@@ -14,9 +14,9 @@ Definition of done
 
 A single deployed frontend supports URLs like:
 
-/demo/bluestone?key=...
+/demo/bluestone
 
-/demo/companyX?key=...
+/demo/companyX
 
 companySlug is the human-readable company name (used in the URL).
 
@@ -24,9 +24,8 @@ The UI defaults to company-filtered history/settings based on the current compan
 
 Backend enforces company constraints (hosts, scraper, ambassador, prompt style) regardless of frontend behavior.
 
-Costs are protected via a lightweight demo gate (no auth system) plus per-company spend limits:
+Costs are protected via per-company spend limits:
 
-- demo key gate (mandatory)
 - per-company lifetime credits (mandatory): 10 successful videos per company (success = mp4 created and URL recorded on the run)
 - per-company concurrency cap (recommended)
 - basic attempt throttles (recommended; protects against repeated failures / link sharing)
@@ -35,13 +34,13 @@ Demo links do not expire (no time-based expiry).
 
 Non-goals
 
-No “onboarding” flow, no user accounts.
+No â€œonboardingâ€ flow, no user accounts.
 
 No multi-tenant production design (billing, orgs, permissions).
 
 No strict tenant isolation via auth/RLS. This is a shared sandbox intended for GTM links.
 
-No generalized “paste any ecommerce URL” promise. Each demo is a controlled mode.
+No generalized â€œpaste any ecommerce URLâ€ promise. Each demo is a controlled mode.
 
 No per-video persona selection UI (personas/models are picked randomly from a curated pool per company config).
 
@@ -67,7 +66,7 @@ Backend:
 
 Supabase Edge Functions:
 
-create-run: orchestrates scrape → Gemini prompt → Kling job
+create-run: orchestrates scrape â†’ Gemini prompt â†’ Kling job
 
 kling-webhook: writes completion status + uploads mp4 to storage
 
@@ -87,7 +86,7 @@ supabase/functions/\_shared/geminiPrompt.ts: jewellery + ambassador + businesswo
 
 Design approach
 
-Key design choice: “Company Config” registry
+Key design choice: â€œCompany Configâ€ registry
 
 
 
@@ -104,8 +103,6 @@ Kling defaults \& model candidates
 whether ambassador/model element is required and which persona pool to use (element name prefixes)
 
 prompt template / policy knobs
-
-demo key gating
 
 spend limits (lifetime credits, concurrency, attempt throttles)
 
@@ -181,8 +178,6 @@ type CompanyConfig
 
 function getCompanyConfig(companySlug: string): CompanyConfig
 
-function assertDemoKey(req: Request, config: CompanyConfig): void
-
 function assertUrlAllowed(url: string, config: CompanyConfig): void
 
 Suggested CompanyConfig shape
@@ -190,12 +185,6 @@ Suggested CompanyConfig shape
 export type CompanyConfig = {
 
 &#x20; slug: string;
-
-
-
-&#x20; // Security / gating
-
-&#x20; demoKey?: string; // if set, request must include correct key
 
 
 
@@ -337,7 +326,7 @@ Back end becomes the source of truth.
 
 Adding a new company becomes: add config entry + implement adapter if needed.
 
-3\) Update create-run to be company-aware + gated
+3\) Update create-run to be company-aware
 
 
 
@@ -351,11 +340,7 @@ Change request body
 
 Current: { url, runId }
 
-New: { url, runId, companySlug, demoKey } (demoKey optional if passed via header)
-
-
-
-Note: Prefer x-demo-key header over query param for cleaner URLs, but query param is acceptable for demos. Either way, implement both to reduce friction.
+New: { url, runId, companySlug }
 
 
 
@@ -367,12 +352,6 @@ const { url, runId, companySlug } = await req.json()
 
 const config = getCompanyConfig(companySlug ?? "bluestone")
 
-Gate early:
-
-Validate demo key before any costly work (scrape/Gemini/Kling).
-
-assertDemoKey(req, config)
-
 Validate URL host against config:
 
 assertUrlAllowed(url, config)
@@ -382,12 +361,12 @@ Remove hardcoded bluestone.com check.
 Enforce per-company lifetime credits before any costly work:
 
 - success = mp4 created and URL recorded on the run (e.g. status = 'completed' and video url column is non-null)
-- if successes >= config.limits.maxLifetimeSuccessfulVideos → return a friendly “out of credits” response (“You have run out of demo credits. Reach out to the developer.”)
+- if successes >= config.limits.maxLifetimeSuccessfulVideos â†’ return a friendly â€œout of creditsâ€ response (â€œYou have run out of demo credits. Reach out to the developer.â€)
 
 Optional attempt throttle (recommended):
 
 - if config.limits.maxAttemptsPerDay is set, count runs created in last 24h for config.slug (any status)
-- if attempts >= maxAttemptsPerDay → return 429 with a friendly “rate limited / reach out to developer” response
+- if attempts >= maxAttemptsPerDay â†’ return 429 with a friendly â€œrate limited / reach out to developerâ€ response
 
 Concurrency guard must be per company:
 
@@ -403,7 +382,7 @@ Insert video\_runs row with company\_slug:
 
 include company\_slug: config.slug
 
-preserve existing “insert early” behavior for fast UI response
+preserve existing â€œinsert earlyâ€ behavior for fast UI response
 
 Scrape using adapter:
 
@@ -445,17 +424,13 @@ Update error mapping
 
 
 
-Your toFriendlyError currently references BRAND\_ELEMENT\_NAME\_PREFIX and “Only BlueStone URLs”. Update messages to be company-aware:
+Your toFriendlyError currently references BRAND\_ELEMENT\_NAME\_PREFIX and â€œOnly BlueStone URLsâ€. Update messages to be company-aware:
 
 
 
-“This tool works exclusively with {companyName} product URLs.”
+â€œThis tool works exclusively with {companyName} product URLs.â€
 
-“No eligible model persona configured for {companySlug} … prefixes: …”
-
-When demo key missing: “Invalid or missing demo key.”
-
-
+â€œNo eligible model persona configured for {companySlug} â€¦ prefixes: â€¦â€
 
 Why
 
@@ -513,7 +488,7 @@ Always assumes jewellery category logic.
 
 Always requires <<<element\_1>>>.
 
-Prompt is deeply shaped around “businesswoman / boardroom” and “no extra jewellery”.
+Prompt is deeply shaped around â€œbusinesswoman / boardroomâ€ and â€œno extra jewelleryâ€.
 
 Proposed refactor (minimal viable)
 
@@ -557,15 +532,15 @@ Modify examples to be product-only two-shot storyboard (studio product shots)
 
 If policy.style === "product\_only\_v1":
 
-Replace “modern successful woman” narrative with:
+Replace â€œmodern successful womanâ€ narrative with:
 
-“premium studio product film”
+â€œpremium studio product filmâ€
 
 slow camera orbit, controlled lighting, shallow DOF
 
-Keep the two-shot JSON structure (so you don’t change Kling call shape)
+Keep the two-shot JSON structure (so you donâ€™t change Kling call shape)
 
-Keep “avoid text/logos” rules
+Keep â€œavoid text/logosâ€ rules
 
 Keep image-token constraints (still valuable):
 
@@ -579,19 +554,19 @@ Why
 
 
 
-You need a non-ambassador mode for companies that don’t want or can’t accept human likenesses.
+You need a non-ambassador mode for companies that donâ€™t want or canâ€™t accept human likenesses.
 
 For companies without brand ambassadors, use a curated generic model persona pool (via elementPrefixCandidates) rather than turning ambassador mode off.
 
-This is also the fastest way to generalize beyond the “ambassador” demo.
+This is also the fastest way to generalize beyond the â€œambassadorâ€ demo.
 
 What not to do in this sprint
 
-Don’t build a full templating engine.
+Donâ€™t build a full templating engine.
 
-Don’t implement category specs beyond jewellery.
+Donâ€™t implement category specs beyond jewellery.
 
-Keep a small number of prompt “styles” as enums.
+Keep a small number of prompt â€œstylesâ€ as enums.
 
 6\) Update webhook and refresh functions (sanity, not strictly required)
 
@@ -635,17 +610,16 @@ No fundamental changes, but:
 
 Ensure it does not accidentally update a run from the wrong company context.
 
-If you add gating, you may enforce demo key here too only if frontend calls it publicly.
+No access keys/auth are used in this GTM demo mode; cost control comes from per-company caps and throttles.
 
 Otherwise a malicious user can poll your jobs and cause storage uploads.
 
 
 
-Recommendation: require demo key for refresh-run too (same assertDemoKey path).
 
 
 
-It’s low friction and closes a cost/abuse hole.
+Itâ€™s low friction and closes a cost/abuse hole.
 
 Frontend changes (Next.js)
 
@@ -709,7 +683,7 @@ Why
 
 Prevents cross-demo contamination and accidental embarrassing history.
 
-9\) Pass companySlug and demoKey to edge functions
+9\) Pass companySlug to edge functions
 
 create-run
 
@@ -719,9 +693,7 @@ Call:
 
 
 
-supabase.functions.invoke("create-run", { body: { url, runId, companySlug, demoKey } })
-
-or pass demoKey via header if supabase client allows (often not directly; body is easiest for demos).
+supabase.functions.invoke("create-run", { body: { url, runId, companySlug } })
 
 refresh-run
 
@@ -731,9 +703,9 @@ Call:
 
 
 
-supabase.functions.invoke("refresh-run", { body: { runId, companySlug, demoKey } })
+supabase.functions.invoke("refresh-run", { body: { runId, companySlug } })
 
-Even if backend doesn’t need companySlug, include it for future-proofing.
+Even if backend doesnâ€™t need companySlug, include it for future-proofing.
 
 
 
@@ -751,9 +723,9 @@ Optional: show a small credits indicator (e.g. 3/10 used) so users understand th
 
 Pre-fill example URL placeholder per company
 
-If company is unknown, show a simple “invalid demo link” message
+If company is unknown, show a simple â€œinvalid demo linkâ€ message
 
-If backend returns “out of credits”, show the message prominently and stop further attempts.
+If backend returns â€œout of creditsâ€, show the message prominently and stop further attempts.
 
 
 
@@ -807,53 +779,9 @@ Avoid collisions and confusion
 
 Security / cost protection
 
-12\) Demo key gate (mandatory)
+12\) Lifetime credits cap (mandatory)
 
-
-
-Without this, your public demo endpoint is an API anyone can spam, and they will spend your Kling + Gemini credits.
-
-
-
-Implementation
-
-Each company config may have demoKey
-
-assertDemoKey(req, config) checks:
-
-x-demo-key header OR JSON body demoKey
-
-matches config.demoKey
-
-If missing/wrong: return 401/403
-
-
-
-Apply gating to:
-
-
-
-create-run (mandatory)
-
-refresh-run (recommended)
-
-kling-webhook already has optional WEBHOOK\_SECRET – keep it
-
-
-
-Why
-
-
-
-Minimal friction
-
-Strong protection
-
-No auth system required
-
-12b\) Lifetime credits cap (mandatory)
-
-This demo will be shared via emailed links, so enforce a per-company lifetime credits cap to prevent runaway spend and to create a clear “reach out to the developer” CTA.
+This demo will be shared via emailed links, so enforce a per-company lifetime credits cap to prevent runaway spend and to create a clear â€œreach out to the developerâ€ CTA.
 
 Definition of success (for credit counting)
 
@@ -863,16 +791,16 @@ High-level implementation
 
 - Add config: limits.maxLifetimeSuccessfulVideos = 10 (per company)
 - In create-run, before any costly work, count successful runs for config.slug and reject if the limit is reached.
-- Make completion handling idempotent so webhook retries don’t double-count “success”.
+- Make completion handling idempotent so webhook retries donâ€™t double-count â€œsuccessâ€.
 
 UX
 
-- When out of credits, return a friendly message: “You have run out of demo credits. Reach out to the developer.”
-- Optional: show a small “credits used” indicator in the UI (e.g. 3/10 used).
+- When out of credits, return a friendly message: â€œYou have run out of demo credits. Reach out to the developer.â€
+- Optional: show a small â€œcredits usedâ€ indicator in the UI (e.g. 3/10 used).
 
-12c\) Attempt throttles (recommended)
+12b\) Attempt throttles (recommended)
 
-Even if only “successful” runs count against credits, repeated failed attempts can still burn time/money. Add a simple per-company throttle:
+Even if only â€œsuccessfulâ€ runs count against credits, repeated failed attempts can still burn time/money. Add a simple per-company throttle:
 
 - If limits.maxAttemptsPerDay is set, count runs created in the last 24h for config.slug (any status) and return 429 when exceeded.
 
@@ -922,7 +850,7 @@ Then build dedicated adapters for high-value targets later.
 
 Work breakdown (Sprint plan)
 
-Phase 1 — Data + config + backend enforcement
+Phase 1 â€” Data + config + backend enforcement
 
 DB migration: add company\_slug, indexes, backfill
 
@@ -931,8 +859,6 @@ Add companyConfig.ts with bluestone config
 Update create-run:
 
 accept companySlug
-
-demo key gate
 
 host allowlist
 
@@ -950,23 +876,21 @@ Update kling.ts: remove hardcoded prefix default
 
 Update geminiPrompt.ts: add PromptPolicy, support requiresAmbassador=false (minimal)
 
-Phase 2 — Frontend routing + history filtering
+Phase 2 â€” Frontend routing + history filtering
 
 Add /demo/\[company] route (or query param approach)
 
 Filter history by company\_slug
 
-Pass companySlug + demoKey into functions
+Pass companySlug into functions
 
 Add demo badge + placeholder URL per company
 
-Phase 3 — Optional but recommended hardening
-
-Gate refresh-run using same demo key
+Phase 3 â€” Optional but recommended hardening
 
 Storage path: ${company\_slug}/${runId}.mp4
 
-Add basic “unknown company” handling in UI
+Add basic â€œunknown companyâ€ handling in UI
 
 Add maxAttemptsPerDay throttling in create-run (prevents repeated failures / link sharing from burning cost)
 
@@ -980,19 +904,13 @@ history shows only bluestone runs
 
 changing to /demo/other shows empty history (unless runs exist)
 
-wrong demo key blocks create-run and refresh-run
-
-after 10 successful videos for a company, create-run is blocked with a clear “out of credits” message
+after 10 successful videos for a company, create-run is blocked with a clear â€œout of creditsâ€ message
 
 failed runs do not count towards the 10-video lifetime cap (success = mp4 created + URL recorded)
 
 Abuse tests
 
-call create-run without demo key → rejected quickly
-
-call refresh-run without demo key → rejected (if implemented)
-
-try URL not in allowedHosts for company → rejected
+try URL not in allowedHosts for company â†’ rejected
 
 if maxAttemptsPerDay is set, exceeding it returns 429 (recommended)
 
@@ -1002,15 +920,15 @@ existing BlueStone flow produces same output quality and uses ambassador element
 
 Risks \& mitigations
 
-Prompt refactor breaks output format → keep existing 2-shot JSON structure; change only ambassador requirement branch.
+Prompt refactor breaks output format â†’ keep existing 2-shot JSON structure; change only ambassador requirement branch.
 
-Kling element selection fails for new company → config requires elementPrefixCandidates when ambassador/model is enabled; otherwise product-only mode.
+Kling element selection fails for new company â†’ config requires elementPrefixCandidates when ambassador/model is enabled; otherwise product-only mode.
 
-Credits cap exceeded due to concurrency/races → keep maxConcurrentRuns low for external demos (often 1) or reserve credits atomically.
+Credits cap exceeded due to concurrency/races â†’ keep maxConcurrentRuns low for external demos (often 1) or reserve credits atomically.
 
-Prospect confusion about shared sandbox/history → make it clear in the email pitch; optionally add a small in-app disclaimer label.
+Prospect confusion about shared sandbox/history â†’ make it clear in the email pitch; optionally add a small in-app disclaimer label.
 
-Scraper fails for other sites → for multi-company demos, expect to pre-build adapters. Generic fallback is “best effort”, not a promise.
+Scraper fails for other sites â†’ for multi-company demos, expect to pre-build adapters. Generic fallback is â€œbest effortâ€, not a promise.
 
 Appendix: Exact files to modify
 
@@ -1022,7 +940,7 @@ Backend:
 
 supabase/functions/create-run/index.ts
 
-supabase/functions/refresh-run/index.ts (recommended gating + storage path)
+supabase/functions/refresh-run/index.ts (storage path)
 
 supabase/functions/kling-webhook/index.ts (storage path + logging)
 
@@ -1050,5 +968,6 @@ New/Move: frontend/src/app/demo/\[company]/page.tsx
 
 frontend/src/lib/supabase.ts (add company\_slug to VideoRun type)
 
-optionally: frontend/src/lib/company.ts (map slug → display name + placeholder URL)
+optionally: frontend/src/lib/company.ts (map slug â†’ display name + placeholder URL)
+
 

@@ -1,12 +1,12 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { getServiceClient } from "../_shared/supabase.ts";
 import { getTaskStatus } from "../_shared/kling.ts";
-import { assertDemoKey, getCompanyConfig, HttpError } from "../_shared/companyConfig.ts";
+import { getCompanyConfig, HttpError } from "../_shared/companyConfig.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-demo-key",
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -33,8 +33,6 @@ serve(async (req) => {
     if (!config) {
       return jsonResponse({ error: "Invalid demo link." }, 404);
     }
-
-    assertDemoKey({ req, config, bodyDemoKey: body.demoKey });
 
     if (!runId) {
       return jsonResponse({ error: "Missing runId" }, 400);

@@ -11,9 +11,6 @@ export type CompanyConfig = {
   slug: string;
   displayName: string;
 
-  // Security / gating
-  demoKey?: string; // if set, request must include correct key
-
   // Which product URLs are allowed in this demo mode
   allowedHosts: string[];
 
@@ -56,7 +53,7 @@ export class HttpError extends Error {
   }
 }
 
-const COMPANY_REGISTRY: Record<string, Omit<CompanyConfig, "demoKey">> = {
+const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
   bluestone: {
     slug: "bluestone",
     displayName: "BlueStone",
@@ -155,18 +152,6 @@ function normalizeCompanySlug(companySlug: string): string {
   return (companySlug || "").trim().toLowerCase();
 }
 
-function demoKeyEnvVarForSlug(slug: string): string {
-  return `DEMO_KEY_${slug.replace(/[^a-z0-9]+/gi, "_").toUpperCase()}`;
-}
-
-function getDemoKeyForCompany(slug: string): string | undefined {
-  return (
-    Deno.env.get(demoKeyEnvVarForSlug(slug)) ??
-    Deno.env.get("DEMO_KEY") ??
-    undefined
-  );
-}
-
 function isHostnameAllowed(hostname: string, allowedHost: string): boolean {
   const h = hostname.trim().toLowerCase();
   const a = allowedHost.trim().toLowerCase();
@@ -177,39 +162,11 @@ export function getCompanyConfig(companySlug: string): CompanyConfig | null {
   const slug = normalizeCompanySlug(companySlug);
   if (!slug) return null;
 
-  const base = COMPANY_REGISTRY[slug];
-  if (!base) return null;
-
-  const config: CompanyConfig = {
-    ...base,
-    demoKey: getDemoKeyForCompany(slug),
-  };
+  const config = COMPANY_REGISTRY[slug];
+  if (!config) return null;
 
   validateCompanyConfig(config);
   return config;
-}
-
-export function assertDemoKey(opts: {
-  req: Request;
-  config: CompanyConfig;
-  bodyDemoKey?: unknown;
-}): void {
-  const required = (opts.config.demoKey || "").trim();
-  if (!required) {
-    throw new HttpError(
-      500,
-      "Demo key is not configured yet. Reach out to the developer."
-    );
-  }
-
-  const headerKey = opts.req.headers.get("x-demo-key");
-  const bodyKey =
-    typeof opts.bodyDemoKey === "string" ? opts.bodyDemoKey : undefined;
-  const provided = (headerKey ?? bodyKey ?? "").trim();
-
-  if (!provided || provided !== required) {
-    throw new HttpError(401, "Invalid or missing demo key.");
-  }
 }
 
 export function assertUrlAllowed(url: string, config: CompanyConfig): void {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase, type VideoRun } from "@/lib/supabase";
 import { UrlInput } from "@/components/url-input";
 import { ProgressCard, ReferencePanel } from "@/components/progress-card";
@@ -8,7 +8,8 @@ import { HistoryList } from "@/components/history-list";
 
 type Props = {
   companySlug: string;
-  demoKey: string;
+  initialUrl?: string;
+  autostart?: boolean;
 };
 
 function normalizeCompanySlug(input: string): string {
@@ -25,17 +26,16 @@ function formatCompanyLabel(slug: string): string {
     .join(" ");
 }
 
-export default function DemoClient({ companySlug, demoKey }: Props) {
+export default function DemoClient({ companySlug, initialUrl, autostart }: Props) {
   const normalizedCompanySlug = normalizeCompanySlug(companySlug);
   const companyLabel = formatCompanyLabel(normalizedCompanySlug);
-  const demoKeyTrimmed = (demoKey || "").trim();
-  const hasKey = demoKeyTrimmed.length > 0;
 
   const [runs, setRuns] = useState<VideoRun[]>([]);
   const [activeRun, setActiveRun] = useState<VideoRun | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
-  const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [showDisclaimer, setShowDisclaimer] = useState(!autostart);
+  const autostartFired = useRef(false);
 
   const activeRunId = activeRun?.id ?? null;
   const activeRunStatus = activeRun?.status ?? null;
@@ -59,6 +59,15 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
     setActiveRun(null);
     loadHistory();
   }, [loadHistory]);
+
+  // Auto-start generation when redirected from the landing page with a URL
+  useEffect(() => {
+    if (autostart && initialUrl && !autostartFired.current) {
+      autostartFired.current = true;
+      handleGenerate(initialUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autostart, initialUrl]);
 
   // Subscribe to realtime updates on active run
   useEffect(() => {
@@ -96,7 +105,6 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
   // Auto-poll every 15s when a run is processing (webhook fallback)
   useEffect(() => {
     if (
-      !hasKey ||
       !activeRunId ||
       (activeRunStatus !== "processing" && activeRunStatus !== "queued")
     ) {
@@ -109,7 +117,6 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
           body: {
             runId: activeRunId,
             companySlug: normalizedCompanySlug,
-            demoKey: demoKeyTrimmed,
           },
         });
 
@@ -145,17 +152,10 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
   }, [
     activeRunId,
     activeRunStatus,
-    demoKeyTrimmed,
-    hasKey,
     normalizedCompanySlug,
   ]);
 
   async function handleGenerate(url: string) {
-    if (!hasKey) {
-      setError("Invalid demo link. Reach out to the developer.");
-      return;
-    }
-
     setError("");
     setStarting(true);
 
@@ -192,7 +192,6 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
           url,
           runId: optimisticRunId,
           companySlug: normalizedCompanySlug,
-          demoKey: demoKeyTrimmed,
         },
       });
 
@@ -291,14 +290,13 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
   }
 
   const handleRefresh = useCallback(async () => {
-    if (!hasKey || !activeRunId) return;
+    if (!activeRunId) return;
 
     try {
       await supabase.functions.invoke("refresh-run", {
         body: {
           runId: activeRunId,
           companySlug: normalizedCompanySlug,
-          demoKey: demoKeyTrimmed,
         },
       });
 
@@ -317,7 +315,7 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
     } catch {
       // Silently fail — user can try again
     }
-  }, [activeRunId, demoKeyTrimmed, hasKey, normalizedCompanySlug]);
+  }, [activeRunId, normalizedCompanySlug]);
 
   function handleSelectRun(run: VideoRun) {
     setActiveRun(run);
@@ -401,17 +399,12 @@ export default function DemoClient({ companySlug, demoKey }: Props) {
             </span>
           </div>
 
-          {!hasKey && (
-            <div className="mb-3 rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 text-sm text-yellow-200/90">
-              This demo link is missing a valid key. Reach out to the developer.
-            </div>
-          )}
-
           <UrlInput
             onSubmit={handleGenerate}
-            disabled={starting || !hasKey}
+            disabled={starting}
             placeholder="https://www.example.com/product/..."
             helperText={`Paste a ${companyLabel} product URL to generate a short video ad.`}
+            initialValue={initialUrl}
           />
 
           {error && (
