@@ -361,17 +361,15 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
                   d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
                 />
               </svg>
-              <h2 className="text-lg font-semibold text-zinc-900">Demo Notice</h2>
+              <h2 className="text-lg font-semibold text-zinc-900">Important Notice</h2>
             </div>
             <div className="space-y-3 text-sm text-zinc-500 leading-relaxed">
               <p>
-                This is a <span className="text-zinc-800 font-medium">technology demo</span>, not a
-                production environment.
+                This is a <span className="text-zinc-800 font-medium">technology demo</span>, intended to showcase the capabilities of the AI video generation technology.
               </p>
               <p>
-                Any on-screen people are{" "}
-                <span className="text-zinc-800 font-medium">generic synthetic personas</span> used
-                only to demonstrate video generation.
+                The likeness of the on-screen people are{" "}
+                <span className="text-zinc-800 font-medium"> only for demonstration purposes</span>.
               </p>
               <p>
                 Generated videos are <span className="text-zinc-800 font-medium">not for commercial use</span>.
