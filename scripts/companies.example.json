@@ -1,0 +1,15 @@
+[
+  {
+    "slug": "bluestone",
+    "name": "BlueStone",
+    "website": "https://www.bluestone.com",
+    "notes": "Example entry"
+  },
+  {
+    "slug": "generic-model",
+    "name": "Generic Model Demo",
+    "website": "https://example.com",
+    "notes": "Replace with a real jewellery brand website before running."
+  }
+]
+

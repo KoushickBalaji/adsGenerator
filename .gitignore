@@ -24,8 +24,12 @@ Thumbs.db
 # Claude
 .claude/
 
+# Research outputs
+scripts/out/
+
 # Local-only element source assets (copied into frontend/public for Vercel hosting)
 Element Sources/
 
 # Local scratch (Codex sandbox cannot delete files)
 frontend/src/app/_delete_test.tmp
+scripts/_tmp_*

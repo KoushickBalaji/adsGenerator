@@ -1,8 +1,16 @@
-export type PromptStyle = "jewellery_businesswoman_v1" | "product_only_v1";
+export type PromptStyle =
+  | "jewellery_businesswoman_v1"
+  | "jewellery_generic_v1"
+  | "product_only_v1";
 
 export type PromptPolicy = {
   requiresAmbassador: boolean;
   style: PromptStyle;
+};
+
+export type PromptOverrides = {
+  creativeBrief?: string | null;
+  variables?: Record<string, unknown>;
 };
 
 export const DEFAULT_PROMPT_POLICY: PromptPolicy = {
@@ -55,7 +63,8 @@ type JewellerySpec = {
 
 function getJewellerySpec(
   categoryRaw: string,
-  imageRefStr: string
+  imageRefStr: string,
+  style: PromptStyle
 ): JewellerySpec {
   const category = (categoryRaw || "").trim().toLowerCase();
 
@@ -81,6 +90,33 @@ function getJewellerySpec(
 
   switch (kind) {
     case "ring":
+      if (style === "jewellery_businesswoman_v1") {
+        return {
+          kind,
+          noun,
+          shot1WornText,
+          shot2WornText,
+          sizeCue: "band ~2-3mm; realistic scale (not chunky/oversized)",
+          visibilityAnchor: "ring hand (single ring; one hand only)",
+          placement: { hand: "right", finger: "ring", other_hand: "bare" },
+          framingHint:
+            "face-centered medium shot; ring hand stays in-frame near desk/body, never reaching toward the lens; other hand stays natural and ring-free",
+          exampleActionShot1:
+            "she reviews a slide deck and makes a quick note with her ring hand - practical movement, no posing; the other hand stays relaxed and ring-free",
+          exampleActionShot2:
+            "she leads a meeting and gestures naturally with her ring hand close to her body while speaking; the other hand remains ring-free",
+          visibilityRules: [
+            "show exactly one ring total (single hand, single finger only)",
+            "no rings on the other hand or on any other fingers",
+            "no stacked bands, no duplicate rings",
+            "no deliberate showcasing (do not hold the ring finger up toward the camera)",
+            "keep the ring visible in natural movement; do not hide it behind large props",
+          ],
+          propObstructionExample:
+            "keep the ring hand in-frame near notebook/keyboard level; avoid symmetrical two-hand poses; avoid mugs/cups fully covering the ring",
+        };
+      }
+
       return {
         kind,
         noun,
@@ -90,11 +126,11 @@ function getJewellerySpec(
         visibilityAnchor: "ring hand (single ring; one hand only)",
         placement: { hand: "right", finger: "ring", other_hand: "bare" },
         framingHint:
-          "face-centered medium shot; ring hand stays in-frame near desk/body, never reaching toward the lens; other hand stays natural and ring-free",
+          "face-centered medium shot; ring hand stays in-frame near torso/body, never reaching toward the lens; other hand stays natural and ring-free",
         exampleActionShot1:
-          "she reviews a slide deck and makes a quick note with her ring hand - practical movement, no posing; the other hand stays relaxed and ring-free",
+          "she signs a receipt or checks a message with her ring hand - practical movement, no posing; the other hand stays relaxed and ring-free",
         exampleActionShot2:
-          "she leads a meeting and gestures naturally with her ring hand close to her body while speaking; the other hand remains ring-free",
+          "she chats with a friend and gestures naturally with her ring hand close to her body while speaking; the other hand remains ring-free",
         visibilityRules: [
           "show exactly one ring total (single hand, single finger only)",
           "no rings on the other hand or on any other fingers",
@@ -103,13 +139,40 @@ function getJewellerySpec(
           "keep the ring visible in natural movement; do not hide it behind large props",
         ],
         propObstructionExample:
-          "keep the ring hand in-frame near notebook/keyboard level; avoid symmetrical two-hand poses; avoid mugs/cups fully covering the ring",
+          "keep the ring hand in-frame near torso level; avoid symmetrical two-hand poses; avoid cups/bags fully covering the ring",
       };
 
     case "necklace":
     case "pendant":
     case "chain":
     case "mangalsutra":
+      if (style === "jewellery_businesswoman_v1") {
+        return {
+          kind,
+          noun,
+          shot1WornText,
+          shot2WornText,
+          sizeCue:
+            "pendant/motif ~15-20mm (0.6-0.8in); delicate chain; not oversized",
+          visibilityAnchor:
+            "neckline/collarbone (jewellery centered and unobstructed)",
+          placement: { area: "neckline/collarbone", centered: true },
+          framingHint:
+            "face-centered medium shot; neckline/collarbone stays visible as a secondary detail (not framed like a product shot)",
+          exampleActionShot1:
+            "she adjusts a blazer lapel while picking up her laptop bag; the jewellery remains naturally visible at the neckline",
+          exampleActionShot2:
+            "she steps out of an elevator and checks her schedule on her phone; hair and fabric stay off her neckline so the jewellery remains visible",
+          visibilityRules: [
+            `show exactly one ${noun}; no extra jewellery`,
+            "keep neckline/collarbone unobstructed (no scarf/high collar covering it)",
+            "no deliberate showcasing (do not touch/pose the jewellery toward camera)",
+          ],
+          propObstructionExample:
+            "avoid scarves/high collars and keep hair off the neckline so the jewellery stays visible",
+        };
+      }
+
       return {
         kind,
         noun,
@@ -122,9 +185,9 @@ function getJewellerySpec(
         framingHint:
           "face-centered medium shot; neckline/collarbone stays visible as a secondary detail (not framed like a product shot)",
         exampleActionShot1:
-          "she adjusts a blazer lapel while picking up her laptop bag; the jewellery remains naturally visible at the neckline",
+          "she smooths her top and grabs her bag as she heads out; the jewellery remains naturally visible at the neckline",
         exampleActionShot2:
-          "she steps out of an elevator and checks her schedule on her phone; hair and fabric stay off her neckline so the jewellery remains visible",
+          "she steps into soft daylight and checks a message on her phone; hair and fabric stay off her neckline so the jewellery remains visible",
         visibilityRules: [
           `show exactly one ${noun}; no extra jewellery`,
           "keep neckline/collarbone unobstructed (no scarf/high collar covering it)",
@@ -135,6 +198,31 @@ function getJewellerySpec(
       };
 
     case "earrings":
+      if (style === "jewellery_businesswoman_v1") {
+        return {
+          kind,
+          noun,
+          shot1WornText,
+          shot2WornText,
+          sizeCue: "~8-15mm; subtle everyday scale (not oversized)",
+          visibilityAnchor: "both ears (hair tucked back)",
+          placement: { ears: "both", hair: "tucked behind ears" },
+          framingHint:
+            "face-centered medium shot; both ears stay visible as a secondary detail (avoid posed hair-tuck 'showing' gestures)",
+          exampleActionShot1:
+            "she listens in a meeting and turns slightly to respond; hair stays tucked enough that both earrings remain visible",
+          exampleActionShot2:
+            "she walks through an office corridor, hair moving naturally but not covering the earrings",
+          visibilityRules: [
+            "show exactly one pair of earrings; no extra jewellery",
+            "keep both ears visible; avoid hair covering the earrings",
+            "no deliberate showcasing (no exaggerated hair-tuck toward the camera)",
+          ],
+          propObstructionExample:
+            "avoid angles/hair that hide one ear; keep both earrings visible in-frame",
+        };
+      }
+
       return {
         kind,
         noun,
@@ -146,9 +234,9 @@ function getJewellerySpec(
         framingHint:
           "face-centered medium shot; both ears stay visible as a secondary detail (avoid posed hair-tuck 'showing' gestures)",
         exampleActionShot1:
-          "she listens in a meeting and turns slightly to respond; hair stays tucked enough that both earrings remain visible",
+          "she smiles while chatting and turns her head slightly to respond; hair stays tucked enough that both earrings remain visible",
         exampleActionShot2:
-          "she walks through an office corridor, hair moving naturally but not covering the earrings",
+          "she walks through a boutique corridor, hair moving naturally but not covering the earrings",
         visibilityRules: [
           "show exactly one pair of earrings; no extra jewellery",
           "keep both ears visible; avoid hair covering the earrings",
@@ -160,6 +248,31 @@ function getJewellerySpec(
 
     case "bracelet":
     case "bangle":
+      if (style === "jewellery_businesswoman_v1") {
+        return {
+          kind,
+          noun,
+          shot1WornText,
+          shot2WornText,
+          sizeCue: "band width ~4-8mm; single piece; not chunky",
+          visibilityAnchor: "one wrist/forearm (unobstructed)",
+          placement: { wrist: "right" },
+          framingHint:
+            "face-centered medium shot; wrist/forearm stays in frame as a secondary detail (not pushed toward lens)",
+          exampleActionShot1:
+            "she types on a laptop and reaches for a notebook; the jewellery on her wrist stays naturally visible",
+          exampleActionShot2:
+            "she rests her forearm on the table during a meeting, wrist visible and unobstructed",
+          visibilityRules: [
+            `show exactly one ${noun} on one wrist; no extra jewellery`,
+            "keep the wrist unobstructed (no cuffs covering it)",
+            "no deliberate showcasing (do not angle the wrist toward the camera)",
+          ],
+          propObstructionExample:
+            "keep the wrist above or beside props; avoid sleeves covering the jewellery",
+        };
+      }
+
       return {
         kind,
         noun,
@@ -171,9 +284,9 @@ function getJewellerySpec(
         framingHint:
           "face-centered medium shot; wrist/forearm stays in frame as a secondary detail (not pushed toward lens)",
         exampleActionShot1:
-          "she types on a laptop and reaches for a notebook; the jewellery on her wrist stays naturally visible",
+          "she flips through a small menu or notebook with her other hand; the jewellery on her wrist stays naturally visible",
         exampleActionShot2:
-          "she rests her forearm on the table during a meeting, wrist visible and unobstructed",
+          "she rests her forearm on a cafe table while scrolling on her phone, wrist visible and unobstructed",
         visibilityRules: [
           `show exactly one ${noun} on one wrist; no extra jewellery`,
           "keep the wrist unobstructed (no cuffs covering it)",
@@ -211,7 +324,7 @@ function getProductOnlyJewellerySpec(
   categoryRaw: string,
   imageRefStr: string
 ): JewellerySpec {
-  const base = getJewellerySpec(categoryRaw, imageRefStr);
+  const base = getJewellerySpec(categoryRaw, imageRefStr, "jewellery_generic_v1");
 
   return {
     ...base,
@@ -273,7 +386,8 @@ const MAX_PRODUCT_IMAGE_CANDIDATES = 12;
 
 function parseSelectedIndices(
   text: string,
-  maxCandidateCount: number
+  maxCandidateCount: number,
+  desiredCount: number
 ): number[] | null {
   const trimmed = (text || "").trim();
   if (!trimmed) return null;
@@ -296,9 +410,9 @@ function parseSelectedIndices(
       if (seen.has(idx)) continue;
       seen.add(idx);
       out.push(idx);
-      if (out.length >= 3) break;
+      if (out.length >= desiredCount) break;
     }
-    return out.length === 3 ? out.map((n) => n - 1) : null;
+    return out.length === desiredCount ? out.map((n) => n - 1) : null;
   }
 
   try {
@@ -321,37 +435,38 @@ function parseSelectedIndices(
     if (seen.has(idx)) continue;
     seen.add(idx);
     nums.push(idx);
-    if (nums.length >= 3) break;
+    if (nums.length >= desiredCount) break;
   }
-  return nums.length === 3 ? nums.map((n) => n - 1) : null;
+  return nums.length === desiredCount ? nums.map((n) => n - 1) : null;
 }
 
-async function selectBestThreeImagesWithGemini(opts: {
+async function selectBestImagesWithGemini(opts: {
   apiKey: string;
   model: string;
+  count: number;
   candidates: Array<{
     url: string;
     part: { inline_data: { mime_type: string; data: string } };
   }>;
 }): Promise<{ selectedIndexes: number[]; usageMetadata?: unknown } | null> {
-  const { apiKey, model, candidates } = opts;
-  if (candidates.length <= 3) return null;
+  const { apiKey, model, candidates, count } = opts;
+  if (candidates.length <= count) return null;
 
   const systemPrompt =
     "You are curating reference images for a jewellery video model. " +
     "You will be shown multiple candidate images labeled Candidate 1..N. " +
-    "Pick the BEST 3 candidates to represent the product design.\n\n" +
+    `Pick the BEST ${count} candidates to represent the product design.\n\n` +
     "CRITERIA (most important first):\n" +
     "- Prefer clean product-only renders (single item on plain background).\n" +
     "- Avoid video thumbnails/posters (play icon, 'VIDEO' label, poster frames).\n" +
     "- Avoid worn/lifestyle shots (hands/models) unless there are no product-only renders.\n" +
     "- Avoid collages or images with multiple jewellery items.\n" +
-    "- Choose 3 distinct angles/views.\n\n" +
+    `- Choose ${count} distinct angles/views.\n\n` +
     "OUTPUT:\n" +
-    'Return ONLY valid JSON: {"selected":[i,j,k]} where i/j/k are 1-based candidate numbers.';
+    `Return ONLY valid JSON: {"selected":[...]} where the array has exactly ${count} items and values are 1-based candidate numbers.`;
 
   const userParts: Array<Record<string, unknown>> = [
-    { text: `Select 3 best candidates out of ${candidates.length}.` },
+    { text: `Select ${count} best candidates out of ${candidates.length}.` },
   ];
   for (let i = 0; i < candidates.length; i++) {
     userParts.push({ text: `Candidate ${i + 1}:` });
@@ -378,15 +493,74 @@ async function selectBestThreeImagesWithGemini(opts: {
 
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  const selectedIndexes = parseSelectedIndices(String(text ?? ""), candidates.length);
+  const selectedIndexes = parseSelectedIndices(
+    String(text ?? ""),
+    candidates.length,
+    count
+  );
   if (!selectedIndexes) return null;
   return { selectedIndexes, usageMetadata: data?.usageMetadata };
+}
+
+function formatPromptOverrides(overrides?: PromptOverrides): string | null {
+  if (!overrides) return null;
+
+  const chunks: string[] = [];
+
+  if (typeof overrides.creativeBrief === "string" && overrides.creativeBrief.trim()) {
+    chunks.push(`Brand creative brief:\n${overrides.creativeBrief.trim()}`);
+  }
+
+  const vars = overrides.variables;
+  if (
+    vars &&
+    typeof vars === "object" &&
+    !Array.isArray(vars) &&
+    Object.keys(vars).length > 0
+  ) {
+    const lines: string[] = [];
+
+    const stringify = (value: unknown): string => {
+      if (value == null) return "";
+      if (typeof value === "string") return value.trim();
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      if (Array.isArray(value)) {
+        const items = value
+          .map((v) => (typeof v === "string" ? v.trim() : String(v)))
+          .filter((v) => Boolean(v))
+          .slice(0, 10);
+        return items.join(", ");
+      }
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    for (const [keyRaw, value] of Object.entries(vars)) {
+      const key = keyRaw.trim();
+      if (!key) continue;
+      const rendered = stringify(value);
+      if (!rendered) continue;
+      lines.push(`- ${key}: ${rendered}`);
+      if (lines.length >= 20) break;
+    }
+
+    if (lines.length > 0) {
+      chunks.push(`Brand variables (use as constraints):\n${lines.join("\n")}`);
+    }
+  }
+
+  if (chunks.length === 0) return null;
+  return chunks.join("\n\n");
 }
 
 export function buildGeminiKlingPromptRequest(
   product: ProductForPrompt,
   imageCount: number,
-  policy: PromptPolicy = DEFAULT_PROMPT_POLICY
+  policy: PromptPolicy = DEFAULT_PROMPT_POLICY,
+  overrides?: PromptOverrides
 ): GeminiKlingPromptRequest {
   const productImageUrls = Array.isArray(product.input_images)
     ? product.input_images
@@ -395,7 +569,7 @@ export function buildGeminiKlingPromptRequest(
     : [];
 
   const imageRefs = Array.from(
-    { length: Math.min(imageCount, 3) },
+    { length: Math.min(imageCount, 4) },
     (_, i) => `<<<image_${i + 1}>>>`
   );
   const imageRefStr = imageRefs.join(", ");
@@ -406,7 +580,7 @@ export function buildGeminiKlingPromptRequest(
 
   const jewellery =
     effectivePolicy.requiresAmbassador
-      ? getJewellerySpec(product.product_category, imageRefStr)
+      ? getJewellerySpec(product.product_category, imageRefStr, effectivePolicy.style)
       : getProductOnlyJewellerySpec(product.product_category, imageRefStr);
 
   const wantsAmbassador = effectivePolicy.requiresAmbassador;
@@ -421,7 +595,10 @@ export function buildGeminiKlingPromptRequest(
     ? "- Use <<<element_1>>> naturally in the story (not \"presenting\" the jewellery)."
     : "";
 
-  const goodExampleShot1 = wantsAmbassador
+  const isBusinesswomanStyle =
+    effectivePolicy.style === "jewellery_businesswoman_v1";
+
+  const goodExampleShot1Ambassador = isBusinesswomanStyle
     ? `Shot 1 (0-5s): ${JSON.stringify({
         ambassador: "<<<element_1>>>",
         scene: {
@@ -455,6 +632,41 @@ export function buildGeminiKlingPromptRequest(
           "clean, premium lifestyle framing that prioritizes her face/story; jewellery stays secondary",
       })}`
     : `Shot 1 (0-5s): ${JSON.stringify({
+        ambassador: "<<<element_1>>>",
+        scene: {
+          setting: "sunlit apartment hallway, getting ready to head out",
+          time_of_day: "late afternoon",
+          mood: "warm, effortless, premium",
+        },
+        wardrobe: {
+          top: "silk knit top (fully opaque, modest neckline)",
+          bottom: "tailored trousers",
+          layer: "light jacket or cardigan",
+          colors: ["cream", "espresso"],
+        },
+        jewellery: {
+          worn_text: jewellery.shot1WornText,
+          size_cue: jewellery.sizeCue,
+          type: jewellery.kind,
+          count: 1,
+          placement: jewellery.placement,
+          no_other_jewellery: true,
+        },
+        camera: {
+          shot: "medium close-up",
+          movement: "gentle push-in",
+          framing: jewellery.framingHint,
+        },
+        action: jewellery.exampleActionShot1,
+        visibility_rules: jewellery.visibilityRules,
+        lighting: "soft natural light with realistic metal reflections",
+        composition:
+          "clean, premium lifestyle framing that prioritizes face/story; jewellery stays secondary",
+      })}`;
+
+  const goodExampleShot1 = wantsAmbassador
+    ? goodExampleShot1Ambassador
+    : `Shot 1 (0-5s): ${JSON.stringify({
         scene: {
           setting: "premium studio cyclorama, clean gradient backdrop",
           mood: "quietly premium, modern, minimal",
@@ -478,7 +690,7 @@ export function buildGeminiKlingPromptRequest(
           "single product only; clean framing; no text/logos; premium studio film look",
       })}`;
 
-  const goodExampleShot2 = wantsAmbassador
+  const goodExampleShot2Ambassador = isBusinesswomanStyle
     ? `Shot 2 (5-10s): ${JSON.stringify({
         ambassador: "<<<element_1>>>",
         continuity: {
@@ -511,6 +723,40 @@ export function buildGeminiKlingPromptRequest(
           "serene framing with a little negative space for an end card (do not mention text/logos)",
       })}`
     : `Shot 2 (5-10s): ${JSON.stringify({
+        ambassador: "<<<element_1>>>",
+        continuity: {
+          same_outfit_as_shot_1: true,
+          same_jewellery_as_shot_1: true,
+        },
+        scene: {
+          setting: "cozy cafe table by a window, early evening",
+          mood: "calm, warm, quietly confident",
+        },
+        jewellery: {
+          worn_text: jewellery.shot2WornText,
+          type: jewellery.kind,
+          count: 1,
+          placement: jewellery.placement,
+          no_other_jewellery: true,
+        },
+        camera: {
+          shot: "medium-close lifestyle",
+          movement: "slow push-in",
+          depth_of_field: "shallow but keeps face + jewellery visible",
+        },
+        action: jewellery.exampleActionShot2,
+        visibility_rules: [
+          ...jewellery.visibilityRules,
+          `keep ${jewellery.visibilityAnchor} visible for the full shot`,
+        ],
+        lighting: "soft practical light with gentle reflections",
+        composition:
+          "serene framing with a little negative space for an end card (do not mention text/logos)",
+      })}`;
+
+  const goodExampleShot2 = wantsAmbassador
+    ? goodExampleShot2Ambassador
+    : `Shot 2 (5-10s): ${JSON.stringify({
         continuity: {
           same_jewellery_as_shot_1: true,
         },
@@ -537,6 +783,50 @@ export function buildGeminiKlingPromptRequest(
           "serene framing with a little negative space for an end card (do not mention text/logos)",
       })}`;
 
+  const brandToneSection = isBusinesswomanStyle
+    ? `BRAND TONE (for this demo): "love in the little things" - warm, intimate, lightly nostalgic romcom feel; premium but relatable (avoid high-society opulence).`
+    : `BRAND TONE (generic for demo): warm, premium, brand-neutral; modern but culturally flexible; relatable, not flashy.`;
+
+  const characterStorySection = isBusinesswomanStyle
+    ? `CHARACTER & STORY (MODERN, SUCCESSFUL WOMAN):
+- Portray <<<element_1>>> as a modern, successful professional: confident, composed, quietly powerful.
+- Prefer day-to-day high-stakes moments that feel real (not glamorous): preparing a boardroom presentation, leading a meeting, stepping out of an elevator, commuting to a big pitch, reviewing a slide deck on a laptop.
+- Use subtle success cues (laptop, notebook, presentation clicker, glass-walled meeting room, office lobby) without turning it into a corporate stereotype.
+- The jewellery must feel like part of her, not the point: keep it present/visible, but NEVER posed or deliberately shown to the camera.`
+    : `CHARACTER & STORY (GENERIC LIFESTYLE):
+- Portray <<<element_1>>> as a stylish, relatable person (any gender): confident, composed, quietly magnetic.
+- Prefer real, everyday moments that feel premium but not flashy: getting ready to head out, a casual meet-up, a small celebration dinner, a quiet morning at home, browsing a boutique, walking outdoors in soft light.
+- Keep the story grounded and human; avoid corporate stereotypes and avoid high-society opulence.
+- The jewellery must feel like part of them, not the point: keep it present/visible, but NEVER posed or deliberately shown to the camera.`;
+
+  const wardrobeSection = isBusinesswomanStyle
+    ? `WARDROBE (BUSINESS PROFESSIONAL):
+- Dress code is fully corporate and boardroom-appropriate.
+- Describe the ambassador's business-professional outfit in Shot 1 (top + bottom + optional layer + 1-2 color cues).
+- Keep the SAME outfit across BOTH shots (no wardrobe change).
+- Aim for variety across generations: choose one of these wardrobe directions each time:
+  - tailored blazer + silk button-down blouse + trousers
+  - monochrome pantsuit + tucked-in blouse
+  - structured sheath midi dress + blazer
+  - high-neck fine-knit top + blazer + pencil skirt
+  - crisp cotton shirt + wide-leg trousers
+- Avoid traditional/ceremonial attire (saree, lehenga, heavy wedding wear) and avoid adding accessories/jewellery beyond the referenced piece.
+- STRICTLY AVOID: corsets, bralettes, lingerie, crop tops, visible bra, deep cleavage, sheer lace, strapless/off-shoulder looks.`
+    : `WARDROBE (GENERIC, PREMIUM, NON-BRANDED):
+- Describe the ambassador's outfit in Shot 1 (top + bottom + optional layer + 1-2 color cues).
+- Keep the SAME outfit across BOTH shots (no wardrobe change).
+- Choose a tasteful, premium, modest look that fits the scene (casual, smart, festive, traditional, or formal are all OK).
+- Avoid visible brand logos or readable text patterns and avoid adding accessories/jewellery beyond the referenced piece.
+- STRICTLY AVOID: corsets, bralettes, lingerie, crop tops, visible bra, deep cleavage, sheer lace, strapless/off-shoulder looks.`;
+
+  const microActionLine = isBusinesswomanStyle
+    ? `- Each shot should include one small, natural micro-action that keeps ${jewellery.visibilityAnchor} readable WITHOUT feeling like a product display (e.g., taking notes during a meeting; neckline unobstructed while adjusting a blazer; hair staying off ears during conversation; wrist visible while typing).`
+    : `- Each shot should include one small, natural micro-action that keeps ${jewellery.visibilityAnchor} readable WITHOUT feeling like a product display (e.g., checking a message while walking; adjusting hair; smoothing a sleeve; placing a hand on a bag strap; resting wrist on a cafe table).`;
+
+  const settingLine = isBusinesswomanStyle
+    ? `- Pick two real-life settings (one per shot). Prefer: modern office, boardroom, elevator, office lobby, commute, cafe between meetings, home office before a presentation, balcony at dusk after a win.`
+    : `- Pick two real-life settings (one per shot). Prefer: bright home, cafe, boutique, outdoor walkway, mirror-ready moment before an event, relaxed dinner setting, festive gathering (keep it grounded and not over-the-top).`;
+
   const systemPromptAmbassador = `You write Kling AI video prompts for a luxury jewellery ad featuring a human subject (model persona).
 
 You MUST use these special reference tokens in your output - they map to real images/people in the video:
@@ -555,26 +845,11 @@ ${ambassadorRuleLine}
 - Visibility anchor for this category: keep ${jewellery.visibilityAnchor} visible as a secondary detail in BOTH shots (never posed or pushed toward the lens).
 - NEVER use the product's name or brand name. Avoid other proper nouns (people/places). Refer to the jewellery only through the image tokens or generic descriptions like "the ring", "the necklace", etc.
 
-BRAND TONE (for this demo): "love in the little things" - warm, intimate, lightly nostalgic romcom feel; premium but relatable (avoid high-society opulence).
+${brandToneSection}
 
-CHARACTER & STORY (MODERN, SUCCESSFUL WOMAN):
-- Portray <<<element_1>>> as a modern, successful professional: confident, composed, quietly powerful.
-- Prefer day-to-day high-stakes moments that feel real (not glamorous): preparing a boardroom presentation, leading a meeting, stepping out of an elevator, commuting to a big pitch, reviewing a slide deck on a laptop.
-- Use subtle success cues (laptop, notebook, presentation clicker, glass-walled meeting room, office lobby) without turning it into a corporate stereotype.
-- The jewellery must feel like part of her, not the point: keep it present/visible, but NEVER posed or deliberately shown to the camera.
+${characterStorySection}
 
-WARDROBE (BUSINESS PROFESSIONAL):
-- Dress code is fully corporate and boardroom-appropriate.
-- Describe the ambassador's business-professional outfit in Shot 1 (top + bottom + optional layer + 1-2 color cues).
-- Keep the SAME outfit across BOTH shots (no wardrobe change).
-- Aim for variety across generations: choose one of these wardrobe directions each time:
-  - tailored blazer + silk button-down blouse + trousers
-  - monochrome pantsuit + tucked-in blouse
-  - structured sheath midi dress + blazer
-  - high-neck fine-knit top + blazer + pencil skirt
-  - crisp cotton shirt + wide-leg trousers
-- Avoid traditional/ceremonial attire (saree, lehenga, heavy wedding wear) and avoid adding accessories/jewellery beyond the referenced piece.
-- STRICTLY AVOID: corsets, bralettes, lingerie, crop tops, visible bra, deep cleavage, sheer lace, strapless/off-shoulder looks.
+${wardrobeSection}
 
 KLING MULTI-SHOT STORYBOARD (JSON STRUCTURE):
 - Write a TWO-SHOT storyboard for ~10s total, 1:1 (square).
@@ -592,13 +867,13 @@ ${storyboardAmbassadorLine}
 - Use ALL image tokens at least once in the overall prompt. Prefer to include ALL tokens together in Shot 1 when first defining the jewellery. In Shot 2, refer to "${jewellery.shot2WornText}" without introducing new ref tokens.
 - Keep the jewellery integrated: show it worn in everyday action, not a product display. Avoid "hero shot" language.
 - Anti-showcase rule: avoid any gesture that looks like "presenting" the jewellery (no hand held up toward the lens, no turning fingers toward camera, no deliberate showcasing). Keep the camera primarily on her face/story; the jewellery is a secondary detail.
-- Each shot should include one small, natural micro-action that keeps ${jewellery.visibilityAnchor} readable WITHOUT feeling like a product display (e.g., taking notes during a meeting; neckline unobstructed while adjusting a blazer; hair staying off ears during conversation; wrist visible while typing).
+${microActionLine}
 - Keep the ambassador visible in both shots (at least face/upper body); avoid cutaways that show only hands or jewellery.
 - End Shot 2 on a calm lifestyle composition with a little negative space for an end card (do not mention text/logos), but keep the ambassador present (no product-only shot).
 - Add more scene detail than a minimal prompt (cinematic but realistic). Avoid adding extra cuts within a shot.
 
 CREATIVE DIRECTION:
-- Pick two real-life settings (one per shot). Prefer: modern office, boardroom, elevator, office lobby, commute, cafe between meetings, home office before a presentation, balcony at dusk after a win.
+${settingLine}
 - Describe camera work and lighting for each shot (tracking, gentle push-in; warm natural light; realistic metal reflections) without calling attention to "product focus".
 - Include environmental texture: fabric movement, steam, wind in hair, ambient reflections.
 - If props are present (cups/plates/books), keep the jewellery unobstructed: ${jewellery.propObstructionExample}.
@@ -656,6 +931,14 @@ ${goodExampleShot2}`;
 
   const systemPrompt = wantsAmbassador ? systemPromptAmbassador : systemPromptProductOnly;
 
+  const ambassadorStoryLine = isBusinesswomanStyle
+    ? `Story: portray <<<element_1>>> as a modern, successful woman in her day-to-day life. Include at least one high-stakes-but-real moment (e.g., prepping/leading a presentation, important meeting, commute to a big pitch). The jewellery must be incidental - never deliberately shown to the camera.`
+    : `Story: portray <<<element_1>>> in a premium, relatable lifestyle moment (brand-neutral). Choose a setting and mood that suits the jewellery; keep it natural, not posing. The jewellery must be incidental - never deliberately shown to the camera.`;
+
+  const ambassadorWardrobeLine = isBusinesswomanStyle
+    ? `Wardrobe: business professional (corporate/boardroom). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).`
+    : `Wardrobe: premium, non-branded outfit (casual/smart/festive/traditional). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).`;
+
   const userMessageAmbassador = `Write a Kling video prompt for:
 Product: ${product.product_title}
 Category: ${product.product_category}
@@ -666,8 +949,8 @@ You MUST use every single one of these tokens in your prompt.
 In Shot 1 JSON, set jewellery.worn_text to exactly: "${jewellery.shot1WornText}".
 In Shot 2 JSON, set jewellery.worn_text to exactly: "${jewellery.shot2WornText}" (do not include any ${imageRefStr} tokens in Shot 2).
 In Shot 1 JSON, include jewellery.size_cue with an approximate real-world measurement based on the reference photos (mm/cm + optional inches), kept short (e.g., "pendant ~18mm (0.7in)").
-Story: portray <<<element_1>>> as a modern, successful woman in her day-to-day life. Include at least one high-stakes-but-real moment (e.g., prepping/leading a presentation, important meeting, commute to a big pitch). The jewellery must be incidental - never deliberately shown to the camera.
-Wardrobe: business professional (corporate/boardroom). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).
+${ambassadorStoryLine}
+${ambassadorWardrobeLine}
 
 Output a TWO-SHOT storyboard using these headings, with ONE JSON object after each heading:
 Shot 1 (0-5s): ...
@@ -692,7 +975,11 @@ Shot 1 (0-5s): ...
 Shot 2 (5-10s): ...
 (~10s total, 1:1). Keep the TOTAL OUTPUT under ${KLING_PROMPT_TARGET_MAX_CHARS} characters (Kling hard limit is ${KLING_PROMPT_MAX_CHARS}). The JSON should include keys like scene, jewellery, camera, action, visibility_rules, lighting, composition. Do not add extra shots.`;
 
-  const userMessage = wantsAmbassador ? userMessageAmbassador : userMessageProductOnly;
+  const userMessageBase = wantsAmbassador ? userMessageAmbassador : userMessageProductOnly;
+  const overridesText = formatPromptOverrides(overrides);
+  const userMessage = overridesText
+    ? `${userMessageBase}\n\n${overridesText}`
+    : userMessageBase;
 
   return {
     model: GEMINI_MODEL,
@@ -748,7 +1035,8 @@ async function imageUrlToGeminiInlineDataPart(
 export async function generateKlingPromptWithGemini(
   product: ProductForPrompt,
   imageCount: number,
-  policy: PromptPolicy = DEFAULT_PROMPT_POLICY
+  policy: PromptPolicy = DEFAULT_PROMPT_POLICY,
+  overrides?: PromptOverrides
 ): Promise<{
   prompt: string;
   request: GeminiKlingPromptRequest;
@@ -764,7 +1052,7 @@ export async function generateKlingPromptWithGemini(
     : [];
 
   // Fetch/encode candidate images once so we can:
-  // 1) optionally ask Gemini to pick the best 3 reference angles
+  // 1) optionally ask Gemini to pick the best 4 reference angles
   // 2) reuse the same inline_data parts for the prompt-generation call (and retry)
   const fetchedCandidates = await Promise.all(
     candidateUrls.map(async (url, originalIndex) => {
@@ -786,37 +1074,38 @@ export async function generateKlingPromptWithGemini(
     )
     .sort((a, b) => a.originalIndex - b.originalIndex);
 
-  let selectedUrls: string[] = candidateUrls.slice(0, 3);
+  let selectedUrls: string[] = candidateUrls.slice(0, 4);
   let selectionUsageMetadata: unknown | undefined;
 
-  if (candidateUrls.length > 3 && loadedCandidates.length >= 3) {
+  if (candidateUrls.length > 4 && loadedCandidates.length >= 4) {
     const selectable = loadedCandidates;
     try {
-      if (selectable.length > 3) {
-        const selection = await selectBestThreeImagesWithGemini({
+      if (selectable.length > 4) {
+        const selection = await selectBestImagesWithGemini({
           apiKey,
           model: GEMINI_MODEL,
+          count: 4,
           candidates: selectable,
         });
         if (selection) {
           selectionUsageMetadata = selection.usageMetadata;
           selectedUrls = selection.selectedIndexes.map((i) => selectable[i].url);
         } else {
-          selectedUrls = selectable.slice(0, 3).map((c) => c.url);
+          selectedUrls = selectable.slice(0, 4).map((c) => c.url);
         }
       } else {
-        selectedUrls = selectable.slice(0, 3).map((c) => c.url);
+        selectedUrls = selectable.slice(0, 4).map((c) => c.url);
       }
     } catch (err) {
       console.warn(
-        "[geminiPrompt] Image selection failed; falling back to first 3 candidates.",
+        "[geminiPrompt] Image selection failed; falling back to first 4 candidates.",
         err
       );
-      selectedUrls = candidateUrls.slice(0, 3);
+      selectedUrls = candidateUrls.slice(0, 4);
     }
-  } else if (loadedCandidates.length >= 3) {
-    // If we have >=3 loadable candidates, prefer those for the first 3 slots.
-    selectedUrls = loadedCandidates.slice(0, 3).map((c) => c.url);
+  } else if (loadedCandidates.length >= 4) {
+    // If we have >=4 loadable candidates, prefer those for the first 4 slots.
+    selectedUrls = loadedCandidates.slice(0, 4).map((c) => c.url);
   }
 
   const selectedSet = new Set(selectedUrls);
@@ -826,7 +1115,7 @@ export async function generateKlingPromptWithGemini(
   ];
 
   // Keep the original product object immutable; create a view with ordered images.
-  // First 3 URLs = Kling + prompt reference tokens, remainder = prompt-only context.
+  // First 4 URLs = Kling + prompt reference tokens, remainder = prompt-only context.
   const orderedProduct: ProductForPrompt = {
     ...product,
     input_images: orderedUrls,
@@ -835,7 +1124,8 @@ export async function generateKlingPromptWithGemini(
   const request = buildGeminiKlingPromptRequest(
     orderedProduct,
     orderedUrls.length || imageCount,
-    policy
+    policy,
+    overrides
   );
 
   // Build product image parts once so we can retry without refetching images.

@@ -8,6 +8,10 @@ import {
 } from "../_shared/kling.ts";
 import { generateKlingPromptWithGemini } from "../_shared/geminiPrompt.ts";
 import {
+  getCompanyPromptProfileOverrides,
+  resolvePromptPolicy,
+} from "../_shared/companyPromptProfile.ts";
+import {
   assertUrlAllowed,
   getCompanyConfig,
   HttpError,
@@ -18,6 +22,37 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+// Best-effort anti-repeat for per-company element IDs (Edge Functions may scale across isolates).
+const lastPickedOverrideElementIdByCompany: Record<string, string> = {};
+
+function pickCompanyElementId(companySlug: string, elementIds: string[]): string {
+  const cleaned = elementIds
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+  const unique = Array.from(new Set(cleaned));
+  if (unique.length === 0) {
+    throw new Error(`[elements] No valid Kling element IDs configured for ${companySlug}`);
+  }
+
+  const last = lastPickedOverrideElementIdByCompany[companySlug];
+  const pool = unique.length > 1 && last ? unique.filter((id) => id !== last) : unique;
+
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  lastPickedOverrideElementIdByCompany[companySlug] = picked;
+  return picked;
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const arr = items.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -55,6 +90,19 @@ serve(async (req) => {
     }
 
     assertUrlAllowed(url, config);
+
+    // Load optional prompt overrides for this company (keeps the demo generic by default).
+    const promptProfileOverrides = await getCompanyPromptProfileOverrides(
+      supabase,
+      config.slug
+    );
+    const { policy: promptPolicy, creativeBrief, variables: promptVariables } =
+      resolvePromptPolicy(config.prompt, promptProfileOverrides);
+
+    const effectivePromptPolicy =
+      promptPolicy.style === "product_only_v1"
+        ? { ...promptPolicy, requiresAmbassador: false }
+        : promptPolicy;
 
     // Step 0: Cleanup stale active runs so they don't permanently block new generations
     // (e.g. if a webhook never arrives or a provider request failed after DB insert).
@@ -153,10 +201,14 @@ serve(async (req) => {
     insertedRunId = run.id;
 
     // Step 3: Scrape product data
+    const scraperAdapter = promptProfileOverrides?.scrapeAdapter ?? config.scraper.adapter;
     const product = await scrapeProduct(url, {
-      adapter: config.scraper.adapter,
+      adapter: scraperAdapter,
       maxReferenceImages: config.scraper.maxReferenceImages,
     });
+    console.log(
+      `[step 3] Scraper adapter: ${scraperAdapter}`,
+    );
     console.log(
       `[step 3] Scraped: "${product.product_title}", ${product.input_images.length} images`
     );
@@ -165,39 +217,65 @@ serve(async (req) => {
     let element: Awaited<ReturnType<typeof getRandomElement>> | null = null;
     let pickedPrefix: string | null = null;
 
-    if (config.kling.ambassador.enabled) {
-      const prefixes = config.kling.ambassador.elementPrefixCandidates ?? [];
-      if (prefixes.length === 0) {
+    const wantsAmbassador = effectivePromptPolicy.requiresAmbassador;
+    if (wantsAmbassador) {
+      if (!config.kling.ambassador.enabled) {
         throw new Error(
-          `No eligible model persona configured for ${config.slug}. prefixes: (empty)`
+          `Prompt policy requires an ambassador, but ${config.slug} has kling.ambassador.enabled=false`
         );
       }
-      pickedPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-      element = await getRandomElement({ namePrefix: pickedPrefix });
-      if (!element) {
-        throw new Error(
-          `No eligible model persona configured for ${config.slug}. prefixes: ${prefixes.join(", ")}`
-        );
+
+      const overrideIds = promptProfileOverrides?.klingElementIds ?? [];
+      if (Array.isArray(overrideIds) && overrideIds.length > 0) {
+        const pickedId = pickCompanyElementId(config.slug, overrideIds);
+        element = { id: pickedId, name: `override:${pickedId}`, type: "IMAGE" };
+        console.log(`[step 4] Model persona (override): ${pickedId}`);
+      } else {
+        const prefixes = config.kling.ambassador.elementPrefixCandidates ?? [];
+        if (prefixes.length === 0) {
+          console.warn(
+            `[step 4] No element prefixes configured for ${config.slug}; continuing without a model persona.`
+          );
+          pickedPrefix = null;
+          element = null;
+        } else {
+          for (const prefix of shuffle(prefixes)) {
+            pickedPrefix = prefix;
+            element = await getRandomElement({ namePrefix: pickedPrefix });
+            if (element) break;
+          }
+
+          if (!element) {
+            console.warn(
+              `[step 4] No eligible model persona configured for ${config.slug}. ` +
+                `Tried prefixes: ${prefixes.join(", ")}. Continuing without a model persona.`
+            );
+            pickedPrefix = null;
+          } else if (!isElementNameEligible(element.name, pickedPrefix ?? "")) {
+            throw new Error(
+              `Selected element "${element.name}" is not eligible. Expected name to start with "${pickedPrefix}".`
+            );
+          } else {
+            console.log(`[step 4] Model persona: ${element.name} (${element.id})`);
+          }
+        }
       }
-      // Defensive: should never happen because getRandomElement filters, but keep a hard guardrail.
-      if (!isElementNameEligible(element.name, pickedPrefix)) {
-        throw new Error(
-          `Selected element "${element.name}" is not eligible. Expected name to start with "${pickedPrefix}".`
-        );
-      }
-      console.log(`[step 4] Model persona: ${element.name} (${element.id})`);
     }
 
     // Step 5: Generate prompt (always includes <<<element_1>>> + <<<image_1>>>...)
     const { prompt, request } = await generateKlingPromptWithGemini(
       product,
       product.input_images.length,
-      config.prompt
+      promptPolicy,
+      {
+        creativeBrief,
+        variables: promptVariables,
+      }
     );
     console.log(`[step 5] Prompt: ${prompt}`);
     console.log(
-      `[step 5] Selected reference angles (first 3): ${(request.productImageUrls || [])
-        .slice(0, 3)
+      `[step 5] Selected reference angles (first 4): ${(request.productImageUrls || [])
+        .slice(0, 4)
         .join(", ")}`
     );
 
@@ -207,10 +285,9 @@ serve(async (req) => {
       .update({
         product_title: product.product_title,
         product_category: product.product_category,
-        // Persist the ordered references used for this run:
-        // - first 3 are used by Kling (video + prompt tokens)
-        // - remaining (if any) are prompt-only context
-        input_images: request.productImageUrls,
+        // Persist the references used for this run (keep the UI simple).
+        // Kling receives the first 4 reference images.
+        input_images: (request.productImageUrls || []).slice(0, 4),
         prompt,
       })
       .eq("id", run.id);
@@ -226,7 +303,7 @@ serve(async (req) => {
     console.log(
       `[step 7] Kling model candidates: ${config.kling.modelCandidates.join(", ")}`
     );
-    const imageList = imgs.slice(0, 3).map((imageUrl) => ({
+    const imageList = imgs.slice(0, 4).map((imageUrl) => ({
       image_url: imageUrl,
     }));
 

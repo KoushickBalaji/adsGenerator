@@ -1,6 +1,9 @@
 export type CompanyScraperAdapter = "bluestone" | "generic" | "shopify";
 
-export type PromptStyle = "jewellery_businesswoman_v1" | "product_only_v1";
+export type PromptStyle =
+  | "jewellery_businesswoman_v1"
+  | "jewellery_generic_v1"
+  | "product_only_v1";
 
 export type PromptPolicy = {
   requiresAmbassador: boolean;
@@ -85,6 +88,378 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     },
   },
 
+  giva: {
+    slug: "giva",
+    displayName: "GIVA",
+    allowedHosts: ["giva.co"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  melorra: {
+    slug: "melorra",
+    displayName: "Melorra",
+    allowedHosts: ["melorra.com"],
+    scraper: {
+      adapter: "generic",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  kushals: {
+    slug: "kushals",
+    displayName: "Kushal's Fashion Jewellery",
+    allowedHosts: ["kushals.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  klarity: {
+    slug: "klarity",
+    displayName: "Klarity",
+    allowedHosts: ["shopklarity.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  quirksmith: {
+    slug: "quirksmith",
+    displayName: "Quirksmith",
+    allowedHosts: ["quirksmith.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  "iyal-silvers": {
+    slug: "iyal-silvers",
+    displayName: "Iyal Silvers",
+    allowedHosts: ["iyalsilvers.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  onya: {
+    slug: "onya",
+    displayName: "ONYA",
+    allowedHosts: ["onyadiamonds.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  aukera: {
+    slug: "aukera",
+    displayName: "Aukera",
+    allowedHosts: ["aukerajewellery.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  caratcult: {
+    slug: "caratcult",
+    displayName: "CaratCult",
+    allowedHosts: ["caratcult.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  shravia: {
+    slug: "shravia",
+    displayName: "Shravia",
+    allowedHosts: ["shravia.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  houseofmila: {
+    slug: "houseofmila",
+    displayName: "House of Mila",
+    allowedHosts: ["houseofmila.co"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
+  ishhaara: {
+    slug: "ishhaara",
+    displayName: "Ishhaara",
+    allowedHosts: ["ishhaara.com"],
+    scraper: {
+      adapter: "shopify",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        elementPrefixCandidates: ["generic-female-v1", "generic-male-v1", "generic-unisex-v1"],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 1,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
   // Optional baselines / examples:
   "generic-model": {
     slug: "generic-model",
@@ -108,7 +483,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     },
     prompt: {
       requiresAmbassador: true,
-      style: "jewellery_businesswoman_v1",
+      style: "jewellery_generic_v1",
     },
     limits: {
       maxConcurrentRuns: 1,
@@ -202,9 +577,11 @@ function validateCompanyConfig(config: CompanyConfig): void {
 
   if (config.kling.ambassador.enabled) {
     const c = config.kling.ambassador.elementPrefixCandidates;
-    if (!Array.isArray(c) || c.length === 0) {
+    // In demo mode we may configure element IDs per-company in `company_prompt_profiles`.
+    // When that override exists, `elementPrefixCandidates` becomes an optional fallback.
+    if (c != null && !Array.isArray(c)) {
       throw new Error(
-        `[companyConfig] ${config.slug}: ambassador.enabled=true but elementPrefixCandidates is missing/empty`
+        `[companyConfig] ${config.slug}: ambassador.enabled=true but elementPrefixCandidates is not an array`
       );
     }
   }

@@ -42,11 +42,11 @@ export function DemoRedirectForm() {
   }
 
   return (
-    <section className="mt-14 rounded-2xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-10 shadow-2xl">
-      <h2 className="text-xl font-semibold text-zinc-100">
+    <section className="mt-14 rounded-2xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-10 shadow-sm">
+      <h2 className="text-xl font-semibold text-zinc-900">
         See it work on your products
       </h2>
-      <p className="mt-2 text-sm text-zinc-400">
+      <p className="mt-2 text-sm text-zinc-500">
         Paste a product URL from your store to generate a video ad instantly.
       </p>
 
@@ -60,7 +60,7 @@ export function DemoRedirectForm() {
               setError("");
             }}
             placeholder="https://www.yourstore.com/product/..."
-            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <button
             type="submit"
@@ -69,10 +69,10 @@ export function DemoRedirectForm() {
             Generate Video
           </button>
         </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-500">{error}</p>}
       </form>
 
-      <p className="mt-4 text-xs text-zinc-500">
+      <p className="mt-4 text-xs text-zinc-400">
         This is a shared demo environment. Reach out to get your brand set up.
       </p>
     </section>

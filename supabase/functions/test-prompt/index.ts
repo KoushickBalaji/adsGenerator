@@ -613,10 +613,10 @@ serve(async (req) => {
       },
       references: {
         // Ordered references used by the prompt generator:
-        // - first 3 are used by Kling (video + prompt tokens)
+        // - first 4 are used by Kling (video + prompt tokens)
         // - remaining (if any) are prompt-only context
         ordered_images: request.productImageUrls,
-        kling_image_list: request.productImageUrls.slice(0, 3),
+        kling_image_list: request.productImageUrls.slice(0, 4),
         gemini_image_context: request.geminiImageContext,
       },
       gemini: {

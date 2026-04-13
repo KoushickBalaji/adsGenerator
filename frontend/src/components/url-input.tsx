@@ -43,7 +43,7 @@ export function UrlInput({ onSubmit, disabled, placeholder, helperText, initialV
           onChange={(e) => setUrl(e.target.value)}
           placeholder={placeholder || "https://example.com/product/..."}
           disabled={disabled}
-          className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-zinc-100 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+          className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
         />
         <button
           type="submit"
@@ -54,9 +54,9 @@ export function UrlInput({ onSubmit, disabled, placeholder, helperText, initialV
         </button>
       </div>
       {error ? (
-        <p className="mt-2 text-sm text-red-400">{error}</p>
+        <p className="mt-2 text-sm text-red-500">{error}</p>
       ) : (
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-zinc-400">
           {helperText || "Paste a product URL to generate a short video ad."}
         </p>
       )}

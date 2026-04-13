@@ -1,353 +1,219 @@
-# BlueStone Video Generation Demo Tool
+﻿# Jewellery Video Generation Demo Tool
 
-Paste a BlueStone product URL -> generate a premium 5-15s jewellery ad video in ~2 minutes.
+Paste a supported jewellery product URL and generate a premium ~10s video ad.
 
-## Goal (Pitch)
+This repo is a **shared demo sandbox** (not production multi-tenant). It supports multiple companies in one UI, while the backend enforces per-company URL allowlists, scraping behavior, prompt policy, and spend limits.
 
-Build a minimal, demo-first web tool to showcase automated ad video generation from a product page:
-- Input: a BlueStone product URL
-- Output: a short, brand-appropriate video generated via Kling
-- Proof: a history feed that makes it feel like a real product (not a one-off script)
+## What This Does
 
-Keep it simple enough to build fast, but polished enough to present to the BlueStone marketing team.
+- Scrapes product title/description/category and multiple product-angle images
+- Uses Gemini to write a two-shot Kling prompt
+- Starts a Kling Omni-Video job with up to **4** reference images
+- Streams status updates to the UI via Supabase Realtime
+- Uploads completed MP4s to Supabase Storage for stable hosting
 
-## Demo Script (What to show in the meeting)
+## Tech Stack
 
-1. Paste a product URL and click "Generate Video"
-2. Watch real-time status updates (queued -> processing -> completed)
-3. Play the final video, then download
-4. Open History to show previous runs and replays
-
-## Tech Stack (Suggested)
-
-- Frontend: Next.js (App Router) on Vercel
-- Backend: Supabase Edge Functions
+- Frontend: Next.js (App Router) in `frontend/`
+- Backend: Supabase Edge Functions in `supabase/functions/`
 - DB: Supabase Postgres
-- Storage: Supabase Storage (final MP4 + optional thumbnail)
-- Video Generation: Kling API v3 (image-to-video, multi-shot)
-- Prompt Generation: Claude API (dynamic prompt from product details)
-- HTML Parsing: deno-dom (JSON-LD / OG tag extraction in Edge Functions)
+- Storage: Supabase Storage bucket `generated-videos`
+- Prompt generation: Gemini (`GEMINI_API_KEY`)
+- Video generation: Kling Omni-Video (`KLING_ACCESS_KEY`/`KLING_SECRET_KEY`)
 
-## MVP Scope (v1)
+## Demo UX
 
-In scope:
-- Single input type: BlueStone product URL
-- Dynamic prompt generation via Claude API (one style guide, product-aware prompts)
-- No authentication, single shared history feed
-- Async generation + status tracking
-- Store output in DB; optionally upload MP4 to Supabase Storage for stable hosting
+- Landing page: paste a product URL; it routes to the correct company demo
+- Company demo route: `/demo/<companySlug>`
+- History list is filtered by `company_slug`
+- “Reference Images” panel shows up to **4** images (the exact images sent to Kling)
 
-Out of scope (do not build):
-- Login/dashboard, multi-user permissions
-- Multiple providers or complex editing
-- Batch generation
-- Music track selection
-- "Campaign builder" UI
+## High-Level Flow
 
-## User Flow
+1. Frontend calls `create-run` with `{ companySlug, url, runId? }`
+2. `create-run` inserts a `video_runs` row, scrapes the product page, generates a Gemini prompt, calls Kling, then updates the run with:
+   - `provider_job_id`
+   - `input_images` (first 4 reference images)
+   - `prompt`
+3. Kling calls `kling-webhook` on completion; the function uploads the MP4 to Supabase Storage and marks the run `completed`
+4. If webhook delivery fails, the UI periodically calls `refresh-run` which polls Kling and performs the same upload + status update
 
-### 1) Input
-- User pastes a BlueStone product URL
-- Clicks "Generate Video"
+## Environment Variables
 
-### 2) Processing
-- Fetch the product page HTML
-- Extract product data (see Scraping Strategy below):
-  - `product_title`, `product_description`, `product_category`
-  - `input_image`: the single best product image (highest resolution, clean/neutral background). Optionally extract a second image as an end frame.
-- Generate a tailored video prompt via Claude API (see Prompt Generation below)
-- Create a provider request:
-  - image(s) + generated prompt
-  - webhook callback (preferred) or Kling API polling fallback
-- Write a `video_runs` row and update status as the job progresses
+Frontend (`frontend/`):
 
-### 3) Output
-- Show progress state + timestamps
-- Show final video with replay and download
-
-### 4) History
-- List previous runs with:
-  - source URL
-  - status
-  - video/thumbnail preview
-  - created time
-
-## Scraping Strategy
-
-Extract product data from BlueStone URLs using a prioritized fallback approach:
-
-1. **JSON-LD** (preferred): Parse `<script type="application/ld+json">` blocks for `@type: Product`. Extracts `name`, `image`, `description`, and `category` reliably.
-2. **Open Graph tags** (fallback): Extract `og:title`, `og:image`, `og:description` from `<meta>` tags.
-3. **HTML selectors** (last resort): Direct DOM scraping of product title headings, image galleries, etc. Most fragile - only use if structured data is absent.
-
-Image selection: prefer the largest/highest-resolution product image. Avoid thumbnails, lifestyle shots, and size-chart images. Look for CDN URL patterns indicating full-size variants.
-
-## Architecture
-
-**Backend status flow (two layers):**
-
-1. **Kling -> DB:** Kling webhook -> `kling-webhook` Edge Function -> updates `video_runs` row. Fallback: `refresh-run` Edge Function polls the **Kling API** (not Supabase) using `provider_job_id`, then updates DB.
-2. **DB -> Frontend:** Supabase Realtime subscription on the `video_runs` row pushes status changes to the UI instantly. The frontend never talks to Kling directly.
-
-```
-Frontend (Vercel)
-  -> Supabase Edge Function: `create-run`
-    -> Claude API (generate prompt)
-    -> Kling API (async image-to-video job)
-  -> Kling webhook -> `kling-webhook` Edge Function -> updates DB
-  -> (fallback) `refresh-run` Edge Function -> polls Kling API -> updates DB
-  -> Supabase Realtime -> Frontend gets instant status updates
-```
-
-## Data Model
-
-### Table: `video_runs`
-
-| Column              | Type       | Description |
-|--------------------|------------|------------|
-| `id`               | uuid       | primary key |
-| `source_url`       | text       | input URL |
-| `product_title`    | text       | extracted title |
-| `status`           | text       | `queued` / `processing` / `completed` / `failed` |
-| `provider`         | text       | `"kling"` |
-| `provider_job_id`  | text       | job ID from provider |
-| `product_category` | text       | extracted category (ring, necklace, etc.) |
-| `input_images`     | jsonb      | array of image URLs (typically 1-2) |
-| `prompt`           | text       | generation prompt sent to provider |
-| `output_video_url` | text       | final video URL (provider or storage) |
-| `thumbnail_url`    | text       | optional |
-| `error_message`    | text       | failure reason |
-| `created_at`       | timestamp  | |
-| `updated_at`       | timestamp  | |
-
-Notes:
-- Consider `provider_job_id` unique (per provider).
-- Add an index on `created_at` for history queries.
-
-## Storage
-
-### Bucket: `generated-videos`
-
-- Store final MP4s (and optionally thumbnails)
-- Public read access is OK for a demo; lock down later for production
-
-## Edge Functions
-
-### 1) `create-run`
-
-Input:
-```json
-{ "url": "https://www.bluestone.com/..." }
-```
-
-Steps:
-- Validate URL (must be a BlueStone product URL)
-- Fetch HTML and extract product data (see Scraping Strategy):
-  - `product_title`, `product_description`, `product_category`
-  - Best single product image (+ optional second image as end frame)
-- Call Claude API to generate a tailored video prompt from product details
-- Insert row in `video_runs` with `status = queued`
-- Call Kling API (async image-to-video), passing:
-  - input image (1-2 images)
-  - generated prompt
-  - webhook URL (preferred)
-- Save `provider_job_id`, update `status = processing`
-- Return `{ runId }`
-
-### 2) `kling-webhook`
-
-Triggered by the provider when the job completes/fails.
-
-Steps:
-- Verify request (shared secret if supported)
-- Extract provider job ID + status + output URL(s)
-- Find matching `video_runs` row
-- Update row status and `output_video_url`
-- Optional: download provider MP4 and upload to Supabase Storage for stable hosting
-
-### 3) Optional: `refresh-run`
-
-Polling fallback if webhook is unreliable - polls the **Kling API** directly:
-- Given `runId`, query Kling API status using `provider_job_id`
-- Update DB row if status has changed
-- Can be triggered manually from the frontend or on a schedule
-
-## Prompt Generation (via Claude API)
-
-Instead of a fixed template, use Claude API to generate a tailored prompt string for Kling. Kling takes a **single `prompt` field** (max 2,500 characters) - no system/user separation on the Kling side.
-
-The flow is:
-
-1. **Claude API call** generates the prompt (system + user prompt are for Claude, not Kling)
-2. **Claude's output** becomes the single `prompt` string sent to Kling
-
-**Claude system prompt (style guide - stays constant):**
-```
-You are a video ad prompt writer for a luxury jewellery brand. Given product details,
-write a single Kling image-to-video prompt (2-3 sentences). Always include:
-- Premium studio lighting with soft reflections
-- Slow cinematic camera motion (pan, orbit, or gentle zoom)
-- A clean, premium background (dark velvet, marble, or gradient)
-- Preserve the exact product design - no modifications
-Keep the prompt under 200 words. Do not include any text overlays or voiceover directions.
-Output only the prompt text, nothing else.
-```
-
-**Claude user prompt (dynamic per product):**
-```
-Product: {product_title}
-Category: {product_category}
-Description: {product_description}
-```
-
-**Claude responds with a prompt string -> sent directly to Kling's `prompt` field:**
-
-For a ring:
-> "A luxurious diamond solitaire ring rests on dark velvet. The camera slowly orbits the ring as studio lighting catches each facet, creating soft prismatic reflections. Gentle depth-of-field draws focus to the centre stone."
-
-For a necklace:
-> "An elegant gold pendant necklace draped over a polished marble surface. The camera glides along the chain in a slow tracking shot, with warm studio lighting highlighting the delicate metalwork and gemstone details."
-
-## Frontend Pages
-
-- `/` (Home)
-  - URL input + Generate button
-  - Progress and latest result (via Supabase Realtime subscription on the active run's row)
-  - History list
-
-## States
-
-Each run supports:
-- `queued`
-- `processing`
-- `completed`
-- `failed`
-
-## Provider Constraints (Kling API v3)
-
-- **Concurrency limit:** 5 simultaneous requests - queue additional requests if needed
-- **Single-shot duration:** 3-15 seconds (flexible in v3)
-- **Multi-shot:** Up to 6 scenes, max 15 seconds total, min 3 seconds per scene. Set `multi_shot: true` and provide a `multi_prompt` array with per-scene prompts and durations
-- **Image input:** `image_list` array - 1 image as `first_frame`, optionally 1 as `end_frame`. Note: multi-shot is incompatible with both first + end frame images
-- **Prompt:** Single `prompt` string, max 2,500 characters. For multi-shot, use `multi_prompt` array instead (mutually exclusive with `prompt`)
-- **Output URL expiry:** Kling-hosted video URLs may expire - always download and upload to Supabase Storage
-
-## Error States
-
-| Scenario | User Sees | Action |
-|----------|-----------|--------|
-| Invalid / non-BlueStone URL | Inline validation error below input | Fix URL and retry |
-| Scraping fails (no product data found) | "Could not extract product details from this URL" | Try a different product URL |
-| Kling generation fails | Error message from provider + retry button | Click retry or try different product |
-| Webhook missed (stuck in `processing`) | "Still processing..." with manual refresh button | Triggers `refresh-run` to poll Kling API |
-
-## Environment Variables (Draft)
-
-Frontend (Vercel):
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Supabase Edge Functions:
-- `KLING_ACCESS_KEY` (from Kling developer portal)
-- `KLING_SECRET_KEY` (from Kling developer portal - used with access key to generate JWT)
-- `GEMINI_API_KEY` (for Gemini prompt generation)
-- `WEBHOOK_SECRET` (optional but recommended)
+Supabase Edge Functions (Supabase project env vars):
 
-## Brand Ambassador Elements (Kling Custom Elements)
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
+- `KLING_ACCESS_KEY`
+- `KLING_SECRET_KEY`
+- `WEBHOOK_SECRET` (optional)
+- `KLING_BASE_URL` (optional; defaults to `https://api-singapore.klingai.com`)
 
-This demo uses Kling **custom elements** as brand ambassadors.
+Local scripts (run from repo root):
 
-Important rule:
-- Only custom elements whose **name starts with `bluestone`** are eligible to be used in production runs.
-  - Example names: `bluestone-anya`, `bluestone-01`, `bluestone-muse-3`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY` (only for `scripts/company-prompt-profiles-research.mjs`)
+- `OPENAI_BASE_URL` (optional; defaults to `https://api.openai.com/v1`)
 
-Why:
-- Prevents accidentally selecting leftover test elements (e.g. `codex-test`) when `create-run` picks a random ambassador.
+Example env templates:
 
-How to verify:
-- Call `GET /functions/v1/test-prompt?mode=elements` and check the `eligible: true` flag.
-- If there are **zero eligible** elements, `create-run` fails with a friendly error asking you to create `bluestone*` elements.
+- `.env.example` (scripts)
+- `frontend/.env.example` (frontend)
 
-Cleanup note:
-- This demo **never uses** elements whose names don’t start with `bluestone`, so leftover test elements are safe to ignore.
-- If you want to delete old **custom** elements via the API, use the existing Edge Function (no new function):
+## Data Model
+
+### `public.video_runs`
+
+One row per generation attempt.
+
+- `company_slug`: which company demo this run belongs to
+- `input_images`: JSON array of up to **4** reference image URLs (used by Kling and shown in the UI)
+- `provider_job_id`: Kling task ID (used by webhook + polling)
+- `output_video_url`: Supabase Storage public URL (when upload succeeds)
+
+### `public.company_prompt_profiles`
+
+One row per company to hold:
+
+- `website_url`
+- website audit fields: `has_ecommerce`, `website_notes`, `scrape_profile` (JSONB)
+- prompt overrides: `prompt_style`, `requires_ambassador`, `creative_brief`, `variables`
+- ambassador overrides: `kling_element_ids` (optional; element IDs override prefix-based selection)
+
+## Company Configuration (Backend Enforcement)
+
+Per-company behavior is defined in:
+
+- `supabase/functions/_shared/companyConfig.ts`
+
+Each company config defines:
+
+- `allowedHosts`: which product URLs are accepted for that demo
+- `scraper.adapter`: `bluestone` | `shopify` | `generic`
+- `scraper.maxReferenceImages`: max candidate images extracted (up to 12)
+- Kling defaults and model candidates
+- Prompt policy (`requiresAmbassador`, `style`)
+- Spend/abuse limits (concurrency, lifetime successful videos, optional daily attempt cap)
+
+The backend rejects unsupported `companySlug` (returns “Invalid demo link.”) and rejects URLs whose hostname is not in that company’s `allowedHosts` list.
+
+## Scraping + Image Handling
+
+The scraper returns:
+
+- `product_title`, `product_description`, `product_category`
+- `input_images`: up to 12 URLs (best-effort)
+
+Adapters:
+
+- `bluestone`: BlueStone internal API for metadata + HTML gallery extraction for multiple angles
+- `shopify`: prefers `/products/<handle>.js` (or `.json`) for clean `title/description/images`, falls back to HTML when blocked
+- `generic`: HTML extraction (JSON-LD `Product` → OG tags → gallery selectors → last-resort image candidates)
+
+Image usage rules:
+
+- Kling uses up to **4** reference images per run
+- When a product has >4 images and at least 4 are fetchable, Gemini can select the best 4
+- Additional images (beyond the first 4) are used as **prompt-only context** (not sent to Kling)
+
+Special cases:
+
+- Melorra: product pages often embed `enlarged_images` paths; the scraper reconstructs high-res URLs so multiple angles are available.
+
+## Operational Scripts
+
+All scripts live in `scripts/` and can read env vars from `.env.local`.
+
+- `node scripts/company-prompt-profiles-seed.mjs --companies scripts/companies.india.json`
+  - Upserts minimal `company_prompt_profiles` rows (primarily `website_url`) from a JSON list
+- `node scripts/company-prompt-profiles-delete.mjs --company <slug>`
+  - Deletes one or more `company_prompt_profiles` rows by slug (useful for cleaning up invalid/non-shoppable sites)
+- `node scripts/company-website-audit.mjs --out-dir scripts/out/website-audit`
+  - Audits each company website and backfills `has_ecommerce`, `website_notes`, and `scrape_profile`
+  - For sites that block automated fetches (e.g. 402/403/429/TLS errors), it records `has_ecommerce=null` and a “manual check needed” note (so the table still captures current state)
+- `node scripts/company-contacts-extract.mjs --out-dir scripts/out/contacts`
+  - Extracts **publicly listed** contact emails from each company site (homepage + contact/about pages) and stores them in `company_prompt_profiles.social_links.emails`
+  - Also captures any Instagram/LinkedIn links discovered and stores them on `company_prompt_profiles.social_links`
+  - Mirrors email buckets into dedicated columns for easier filtering in Supabase UI: `emails_general`, `emails_support`, `emails_sales`, `emails_founder`, `emails_other` (plus computed `email_primary`)
+- `node scripts/company-linkedin-people-research.mjs --out-dir scripts/out/linkedin`
+  - Uses OpenAI `web_search` to find the official LinkedIn company page + founder/CXO profile URLs and stores them in `company_prompt_profiles.social_links.linkedin_company_url` and `company_prompt_profiles.social_links.linkedin_people`
+  - If OpenAI quota/tooling isn’t available, you can still add LinkedIn entry points via `company-linkedin-manual-merge.mjs` (using URLs found in normal web search or from each company’s own site)
+- `node scripts/company-linkedin-people-from-website.mjs`
+  - Derives `linkedin_company_urls` + `linkedin_people_urls` from on-site LinkedIn links already captured in `social_links.linkedin` (no web search)
+- `node scripts/company-linkedin-company-ddg-jina.mjs --out-dir scripts/out/linkedin-company`
+  - Uses DuckDuckGo HTML (fetched via `r.jina.ai`) to discover LinkedIn **company page** URLs and stores them in `company_prompt_profiles.social_links.linkedin_company_urls` (no OpenAI API)
+  - Records `company_prompt_profiles.social_links.linkedin_company_audit.no_company_page_found=true` when no LinkedIn company page is discoverable (so reruns can skip unless forced)
+- `node scripts/company-linkedin-ddg-search.mjs --out-dir scripts/out/linkedin-ddg`
+  - Uses DuckDuckGo HTML (fetched via `r.jina.ai`) to discover LinkedIn **company pages** + **people profile** entry points (founder/CXO-ish queries)
+  - Stores results in `company_prompt_profiles.social_links.linkedin_company_urls` and `company_prompt_profiles.social_links.linkedin_people_urls` (no OpenAI API)
+  - Mirrors key fields into columns: `linkedin_company_url`, `linkedin_people_urls` (plus computed `linkedin_person_primary`)
+- `node scripts/company-emails-search-ddg-jina.mjs --out-dir scripts/out/email-search`
+  - Fallback email discovery: searches `site:<domain>` via DuckDuckGo (fetched through `r.jina.ai`) to find **publicly listed** contact email addresses when direct scraping finds none
+- `node scripts/outreach-wave-init.mjs`
+  - Sets `outreach_wave` (and optionally resets `outreach_status`) for the first set of companies you want to contact, so you can track outreach directly from the `company_prompt_profiles` table
+- `node scripts/demo-pages-verify.mjs --wave 1`
+  - Verifies demo pages are reachable (and optionally records `demo_http_status` + `demo_verified_at` on `company_prompt_profiles`)
+- `node scripts/company-linkedin-manual-merge.mjs --in scripts/out/linkedin-manual/<file>.json`
+  - Merges manually researched LinkedIn company/people URLs into `social_links.linkedin_company_urls` and `social_links.linkedin_people_urls` (useful when automated web search is blocked or rate-limited)
+- `node scripts/company-smoke-generate.mjs --out-dir scripts/out/smoke --videos-per-company 1`
+  - Seeds 1+ completed run per company (populates History and validates scraping)
+- `node scripts/report-reference-images.mjs`
+  - Prints how many reference images were stored on the latest completed run per company
+- `node scripts/company-prompt-profiles-research.mjs --companies scripts/companies.bangalore.json --out-dir scripts/out` (or any JSON list matching the same shape)
+  - Uses the OpenAI Responses API with web search to generate and upsert prompt profile overrides
+- `node scripts/kling-elements-list.mjs`
+  - Lists Kling elements and helps collect element IDs for `kling_element_ids`
+
+`scripts/out/` is intentionally gitignored (research/audit artifacts).
+
+## Adding a New Company
+
+1. Add a config entry in `supabase/functions/_shared/companyConfig.ts`:
+   - `slug`, `allowedHosts`, scraper adapter, prompt policy, limits
+2. Add hostname mapping in `frontend/src/lib/company.ts` so the landing page can route URLs to the correct demo
+3. Insert a `company_prompt_profiles` row (at minimum: `company_slug`, `website_url`)
+   - Either manually in Supabase or via `node scripts/company-prompt-profiles-seed.mjs --companies <file>`
+4. Run `company-website-audit.mjs` to populate `has_ecommerce`, `website_notes`, and `scrape_profile`
+5. Run `company-smoke-generate.mjs` to seed a completed run and validate multi-image extraction
+
+## Removing a Company
+
+- Remove from backend config (`companyConfig.ts`) and frontend host mapping (`frontend/src/lib/company.ts`)
+- Delete its row in `company_prompt_profiles` (and optionally purge `video_runs`) via a migration so the shared demo UI can’t route to it
+
+## Kling Elements (Model Personas)
+
+The demo can optionally use Kling “elements” (custom personas) to keep a consistent on-screen model.
+
+- Per-company element IDs can be set on `company_prompt_profiles.kling_element_ids`
+- If no IDs are set, the backend falls back to prefix-based selection from `companyConfig.kling.ambassador.elementPrefixCandidates`
+
+Admin utility endpoints (via `supabase/functions/test-prompt`):
+
+- List elements:
+  - `GET /functions/v1/test-prompt?mode=elements&kind=custom|preset|all&all=true&pageSize=100&maxPages=20&prefix=<prefix>`
+- Create elements in bulk:
+  - `POST /functions/v1/test-prompt?mode=elements-create`
+  - Header: `x-admin-secret: <WEBHOOK_SECRET>`
+- Delete elements in bulk:
   - `POST /functions/v1/test-prompt?mode=elements-delete`
   - Header: `x-admin-secret: <WEBHOOK_SECRET>`
-  - Start with `dry_run: true` and verify the list before running with `dry_run: false` + `confirm: "DELETE"`.
 
-How to create a few elements quickly (local bulk upload):
-1. Copy `scripts/kling-elements-manifest.example.json` and update names + image paths (you can point to different folders on `D:\`).
-2. Set `KLING_ACCESS_KEY` and `KLING_SECRET_KEY` in your shell.
-3. Run `node scripts/kling-elements-upload.mjs --manifest "D:\path\to\elements.manifest.json"`
-   - If Kling expects data-URLs instead of raw Base64, rerun with `--data-url`.
+Local bulk upload helpers:
 
-How to create a few elements quickly (Vercel-hosted images + Postman, no local keys):
-1. Add images to the frontend repo (example structure):
-   - `frontend/public/kling-elements/bluestone-anya/front.jpg`
-   - `frontend/public/kling-elements/bluestone-anya/ref1.jpg`
-   - This repo also includes sample sets for `bluestone-muse-01` -> `bluestone-muse-04` under `frontend/public/kling-elements/`.
-2. Deploy the frontend to Vercel (the images must be publicly reachable by URL for Kling to ingest them).
-3. Call the existing Edge Function (no new function):
-   - `POST /functions/v1/test-prompt?mode=elements-create`
-   - Header: `x-admin-secret: <WEBHOOK_SECRET>`
-   - Body example (or start from `scripts/bluestone-elements-create.example.json`):
-     ```json
-     {
-       "assets_base_url": "https://<your-vercel-domain>",
-        "elements": [
-          {
-           "name": "bluestone-anya",
-           "frontal_path": "/kling-elements/bluestone-anya/front.jpg",
-           "ref_paths": ["/kling-elements/bluestone-anya/ref1.jpg", "/kling-elements/bluestone-anya/ref2.jpg"]
-         }
-       ]
-     }
-     ```
+- `node scripts/kling-elements-upload.mjs --manifest scripts/kling-elements-manifest.example.json`
+- `node scripts/kling-elements-list.mjs --prefix <prefix>`
 
-Note:
-- These images are not linked from the UI, but any publicly reachable URL is technically accessible if someone knows the exact path.
+## Before You Share Demo Links
 
-How to delete old `bluestone*` elements (API cleanup):
-1. List what exists:
-   - `GET /functions/v1/test-prompt?mode=elements&kind=custom&all=true&pageSize=100`
-2. Dry run delete by prefix:
-   - `POST /functions/v1/test-prompt?mode=elements-delete`
-   - Header: `x-admin-secret: <WEBHOOK_SECRET>`
-   - Body: `scripts/bluestone-elements-delete.example.json` (starts as `dry_run: true`)
-3. Real delete:
-   - Re-run with `dry_run: false` and `confirm: "DELETE"`.
+- Seed at least 1 completed run per company (`company-smoke-generate.mjs`) so the History panel looks real
+- Verify each company produces 3–4 reference images on the latest run (`report-reference-images.mjs`)
+- Keep a backup product URL per company in case a product page changes
 
-## Success Criteria
-
-- User pastes URL -> gets video in < 2 minutes
-- Output looks like a real jewellery ad (premium lighting + motion)
-- History clearly shows past runs
-- No visible backend complexity in the UI
-
-## Risks / Notes (Demo Reality)
-
-- Product page scraping can break if markup changes; prefer JSON-LD / OG tags when available.
-- Provider output URLs may expire; upload final MP4 to Supabase Storage for stability.
-- Webhooks can fail; `refresh-run` polling is a good fallback.
-
-## Future Enhancements (Not in v1)
-
-- Multi-shot videos (Kling v3 native support: up to 6 scenes, 15s total)
-- Multiple templates/styles
-- Batch generation
-- Brand-specific prompt tuning
-- Model/face consistency (if required later)
-
-## Before the Demo (Checklist)
-
-- [ ] Pre-generate 3-5 videos across product categories (ring, necklace, earring, bracelet) so the history feed looks populated
-- [ ] Verify all pre-generated videos are stored in Supabase Storage (not relying on expired Kling URLs)
-- [ ] Have 2-3 backup product URLs ready in case a live generation is slow
-- [ ] Test the full flow end-to-end at least once on the day of the demo
-
----
-
-This is demo-first, not production-grade. Optimize for:
-- speed of build
-- output quality
-- simplicity

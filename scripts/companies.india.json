@@ -1,0 +1,798 @@
+[
+  {
+    "slug": "bluestone",
+    "name": "BlueStone",
+    "website": "https://www.bluestone.com",
+    "notes": "Bengaluru-based online jeweller (large SKU catalog)."
+  },
+  {
+    "slug": "giva",
+    "name": "GIVA",
+    "website": "https://www.giva.co",
+    "notes": "Bengaluru-headquartered D2C jewellery brand."
+  },
+  {
+    "slug": "melorra",
+    "name": "Melorra",
+    "website": "https://www.melorra.com",
+    "notes": "Bengaluru-based online jewellery brand."
+  },
+  {
+    "slug": "kushals",
+    "name": "Kushal's Fashion Jewellery",
+    "website": "https://www.kushals.com",
+    "notes": "Bengaluru-based fashion jewellery brand."
+  },
+  {
+    "slug": "klarity",
+    "name": "Klarity",
+    "website": "https://shopklarity.com",
+    "notes": "Bengaluru-based 92.5 silver brand."
+  },
+  {
+    "slug": "quirksmith",
+    "name": "Quirksmith",
+    "website": "https://quirksmith.com",
+    "notes": "Bengaluru-based silver jewellery brand."
+  },
+  {
+    "slug": "iyal-silvers",
+    "name": "Iyal Silvers",
+    "website": "https://iyalsilvers.com",
+    "notes": "Bengaluru-based 925 silver brand."
+  },
+  {
+    "slug": "onya",
+    "name": "ONYA",
+    "website": "https://onyadiamonds.com",
+    "notes": "Bengaluru-based lab-grown diamond jewellery startup."
+  },
+  {
+    "slug": "aukera",
+    "name": "Aukera",
+    "website": "https://aukerajewellery.com",
+    "notes": "Lab-grown diamond jewellery brand (Bengaluru presence)."
+  },
+  {
+    "slug": "caratcult",
+    "name": "CaratCult",
+    "website": "https://caratcult.com",
+    "notes": "Lab-grown diamond jewellery brand (Bengaluru presence)."
+  },
+  {
+    "slug": "ecosparckle",
+    "name": "EcoSparckle",
+    "website": "https://ecosparckle.com",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "krivansh",
+    "name": "Krivansh",
+    "website": "https://krivansh.com",
+    "notes": "Bengaluru-based fashion jewellery brand with online store."
+  },
+  {
+    "slug": "ryu-jewels",
+    "name": "Ryu Jewels",
+    "website": "https://ryujewels.com",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "siora",
+    "name": "Siora Jewels",
+    "website": "https://www.siorajewels.com",
+    "notes": "Bengaluru-based silver jewellery brand with online store."
+  },
+  {
+    "slug": "ko-jewellery",
+    "name": "KO Jewellery",
+    "website": "https://thekojewelleryshop.com",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "chaitra",
+    "name": "Chaitra Fine Jewels",
+    "website": "https://www.chaitra.co",
+    "notes": "Bengaluru-based fine jewellery brand with online store."
+  },
+  {
+    "slug": "fasheen",
+    "name": "Fasheen (Esmique)",
+    "website": "https://fasheen.com",
+    "notes": "Bengaluru-based 925 silver jewellery brand (Esmique) with online store."
+  },
+  {
+    "slug": "saanchis",
+    "name": "Saanchi's Silver",
+    "website": "https://www.saanchis.in",
+    "notes": "Bengaluru-based silver jewellery brand with online store."
+  },
+  {
+    "slug": "arna",
+    "name": "Arna",
+    "website": "https://www.arnastore.com",
+    "notes": "Bengaluru-based jewellery/accessories brand with online store."
+  },
+  {
+    "slug": "sparshya-jewels",
+    "name": "Sparshya Jewels",
+    "website": "https://www.sparshyajewels.com",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "mishka-luxe",
+    "name": "Mishka Luxe",
+    "website": "https://www.mishkaluxe.com",
+    "notes": "Bengaluru-based jewellery brand (verify shoppability via audit)."
+  },
+
+  {
+    "slug": "palmonas",
+    "name": "Palmonas",
+    "website": "https://palmonas.com",
+    "notes": "India D2C demi-fine jewellery brand."
+  },
+  {
+    "slug": "zariin",
+    "name": "Zariin",
+    "website": "https://zariin.com",
+    "notes": "India D2C fashion jewellery brand."
+  },
+  {
+    "slug": "outhouse",
+    "name": "Outhouse Jewellery",
+    "website": "https://outhouse-jewellery.com",
+    "notes": "India designer fashion jewellery brand."
+  },
+  {
+    "slug": "isharya",
+    "name": "Isharya",
+    "website": "https://isharya.com",
+    "notes": "India designer jewellery brand."
+  },
+  {
+    "slug": "voylla",
+    "name": "Voylla",
+    "website": "https://www.voylla.com",
+    "notes": "India fashion jewellery brand with large catalog."
+  },
+  {
+    "slug": "rubans",
+    "name": "Rubans",
+    "website": "https://rubans.in",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "limelight",
+    "name": "Limelight Diamonds",
+    "website": "https://limelightdiamonds.com",
+    "notes": "India lab-grown diamond jewellery brand."
+  },
+  {
+    "slug": "aurique",
+    "name": "Aurique",
+    "website": "https://www.aurique.in",
+    "notes": "India lab-grown diamond jewellery brand."
+  },
+  {
+    "slug": "jewelbox",
+    "name": "Jewelbox",
+    "website": "https://jewelbox.co.in",
+    "notes": "India lab-grown diamond jewellery brand."
+  },
+  {
+    "slug": "reia",
+    "name": "Reia",
+    "website": "https://reia.diamonds",
+    "notes": "India lab-grown diamond jewellery brand."
+  },
+  {
+    "slug": "geer",
+    "name": "Geer",
+    "website": "https://geer.in",
+    "notes": "India lab-grown diamond jewellery brand."
+  },
+  {
+    "slug": "ivana-jewels",
+    "name": "Ivana Jewels",
+    "website": "https://ivanajewels.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "thecaratcreations",
+    "name": "The Carat Creations",
+    "website": "https://thecaratcreations.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "caratbazaar",
+    "name": "CaratBazaar",
+    "website": "https://caratbazaar.in",
+    "notes": "India lab-grown diamond jewellery brand."
+  },
+  {
+    "slug": "sylva-jewels",
+    "name": "Sylva Jewels",
+    "website": "https://sylvajewels.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "houseofmila",
+    "name": "House of Mila",
+    "website": "https://houseofmila.co",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "arka-jaipur",
+    "name": "Arka Jaipur",
+    "website": "https://www.arkajaipur.com",
+    "notes": "Jaipur-based jewellery brand with online store."
+  },
+  {
+    "slug": "eloura",
+    "name": "Eloura Sterling",
+    "website": "https://elourasterling.com",
+    "notes": "India 925 silver brand with online store."
+  },
+  {
+    "slug": "sterlyn",
+    "name": "Sterlyn",
+    "website": "https://sterlyn.in",
+    "notes": "India 925 silver brand with online store."
+  },
+  {
+    "slug": "silviya",
+    "name": "Silviya",
+    "website": "https://silviya.co",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "glyters",
+    "name": "Glyters",
+    "website": "https://www.glyters.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "shrinika",
+    "name": "Shrinika Jewellery",
+    "website": "https://shrinikajewellery.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "tyaani",
+    "name": "Tyaani Jewellery",
+    "website": "https://tyaani.com",
+    "notes": "India fine jewellery brand with online store."
+  },
+
+  {
+    "slug": "shravia",
+    "name": "Shravia",
+    "website": "https://www.shravia.com",
+    "notes": "India anti-tarnish jewellery brand with online store."
+  },
+  {
+    "slug": "myki",
+    "name": "MYKI",
+    "website": "https://www.myki.in",
+    "notes": "India anti-tarnish artificial jewellery brand with online store."
+  },
+  {
+    "slug": "jewelorbs",
+    "name": "JewelOrbs",
+    "website": "https://jewelorbs.com",
+    "notes": "India anti-tarnish jewellery brand with online store."
+  },
+  {
+    "slug": "liliorigin",
+    "name": "Lili Origin",
+    "website": "https://liliorigin.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "clartstudios",
+    "name": "Clart Studios",
+    "website": "https://clartstudios.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "zoolari",
+    "name": "Zoolari",
+    "website": "https://zoolari.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "brijsun",
+    "name": "Brijsun",
+    "website": "https://brijsun.com",
+    "notes": "India artificial jewellery brand with online store."
+  },
+  {
+    "slug": "muse-store",
+    "name": "Muse",
+    "website": "https://musethestore.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "everall",
+    "name": "Everall",
+    "website": "https://everall.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "asp-fashion-jewellery",
+    "name": "ASP Fashion Jewellery",
+    "website": "https://aspfashionjewellery.com",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "kankanam",
+    "name": "Kankanam",
+    "website": "https://kankanam.net",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "mahashri-jewellery",
+    "name": "Mahashri Jewellery",
+    "website": "https://mahashrijewellery.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "desi-morni",
+    "name": "Desi Morni",
+    "website": "https://desimorni.com",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "sonvi",
+    "name": "Sonvi Jewels",
+    "website": "https://www.sonvijewels.com",
+    "notes": "India anti-tarnish artificial jewellery brand with online store."
+  },
+  {
+    "slug": "jewelit",
+    "name": "Jewelit",
+    "website": "https://thejewelit.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "lavorish",
+    "name": "Lavorish",
+    "website": "https://lavorish.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "aura-american-diamonds",
+    "name": "Aura American Diamonds",
+    "website": "https://auraamericandiamonds.com",
+    "notes": "India American-diamond (CZ) jewellery brand with online store."
+  },
+  {
+    "slug": "anayah-jewellery",
+    "name": "Anayah Jewellery",
+    "website": "https://anayahjewellery.in",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "zauv",
+    "name": "Zauv",
+    "website": "https://zauv.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "twinkear",
+    "name": "Twinkear",
+    "website": "https://twinkear.com",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "queens-silver-jewellery",
+    "name": "Queen Silver Jewellery",
+    "website": "https://queenssilverjewellery.com",
+    "notes": "India silver jewellery brand with online store."
+  },
+  {
+    "slug": "adjewellery",
+    "name": "AD Jewellery",
+    "website": "https://adjewellery.com",
+    "notes": "India jewellery brand (American diamond / imitation) with online store."
+  },
+  {
+    "slug": "varshika-jewellers",
+    "name": "Varshika Jewellers",
+    "website": "https://varshikajewellers.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "ebn-jewelry",
+    "name": "EBN Jewelry",
+    "website": "https://ebnjewelry.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "brilliantany",
+    "name": "Brilliantany",
+    "website": "https://brilliantany.in",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "svaraa",
+    "name": "Svaraa",
+    "website": "https://svaraa.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "tayi-jewellers",
+    "name": "Tayi Jewellers",
+    "website": "https://tayijewellers.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "sparkora",
+    "name": "Sparkora",
+    "website": "https://sparkora.in",
+    "notes": "India anti-tarnish jewellery brand with online store."
+  },
+  {
+    "slug": "vibhaya",
+    "name": "Vibhaya (DIAA)",
+    "website": "https://vibhaya.com",
+    "notes": "India jewellery brand (DIAA) with online store."
+  },
+  {
+    "slug": "erava",
+    "name": "Erava",
+    "website": "https://erava.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "hoopsie",
+    "name": "Hoopsie",
+    "website": "https://hoopsie.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "lahiya",
+    "name": "Lahiya",
+    "website": "https://lahiya.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "amairah",
+    "name": "Amairah",
+    "website": "https://amairah.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "zaisha",
+    "name": "Zaisha",
+    "website": "https://zaisha.co.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "aurvia",
+    "name": "Aurvia",
+    "website": "https://aurvia.in",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "elegantmiss",
+    "name": "ElegantMiss",
+    "website": "https://elegantmiss.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "moissani",
+    "name": "Moissani",
+    "website": "https://moissani.in",
+    "notes": "India moissanite jewellery brand with online store."
+  },
+  {
+    "slug": "meorii",
+    "name": "Meorii",
+    "website": "https://meorii.com",
+    "notes": "India moissanite jewellery brand with online store."
+  },
+  {
+    "slug": "relik",
+    "name": "Relik",
+    "website": "https://relik.co",
+    "notes": "India moissanite jewellery brand with online store."
+  },
+  {
+    "slug": "ishhaara",
+    "name": "Ishhaara",
+    "website": "https://ishhaara.com",
+    "notes": "India moissanite jewellery brand with online store."
+  },
+  {
+    "slug": "moissaniteinindia",
+    "name": "Moissanite In India",
+    "website": "https://moissaniteinindia.com",
+    "notes": "India moissanite jewellery brand with online store."
+  },
+  {
+    "slug": "sukkhi",
+    "name": "Sukkhi",
+    "website": "https://www.sukkhi.com",
+    "notes": "India fashion / American-diamond jewellery brand with online store."
+  },
+  {
+    "slug": "priyaasi",
+    "name": "Priyaasi",
+    "website": "https://www.priyaasi.com",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "peora",
+    "name": "Peora",
+    "website": "https://peorajewellery.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "szaveri",
+    "name": "S. Zaveri & Sons",
+    "website": "https://www.szaveri.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "yellowchimes",
+    "name": "Yellow Chimes",
+    "website": "https://yellowchimes.com",
+    "notes": "India fashion jewellery brand with online store."
+  },
+
+  {
+    "slug": "caratlane",
+    "name": "CaratLane",
+    "website": "https://www.caratlane.com",
+    "notes": "India online jewellery brand (larger)."
+  },
+  {
+    "slug": "candere",
+    "name": "Candere",
+    "website": "https://www.candere.com",
+    "notes": "India online jewellery brand (larger)."
+  },
+  {
+    "slug": "mia-by-tanishq",
+    "name": "Mia by Tanishq",
+    "website": "https://www.miabytanishq.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "tanishq",
+    "name": "Tanishq",
+    "website": "https://www.tanishq.co.in",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "malabar",
+    "name": "Malabar Gold & Diamonds",
+    "website": "https://www.malabargoldanddiamonds.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "kalyan",
+    "name": "Kalyan Jewellers",
+    "website": "https://www.kalyanjewellers.net",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "senco",
+    "name": "Senco Gold & Diamonds",
+    "website": "https://www.sencogoldanddiamonds.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "png-jewellers",
+    "name": "PNG Jewellers",
+    "website": "https://www.pngjewellers.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "grt-jewels",
+    "name": "GRT Jewels",
+    "website": "https://www.grtjewels.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "tbz",
+    "name": "TBZ (The Original)",
+    "website": "https://www.tbztheoriginal.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "joyalukkas",
+    "name": "Joyalukkas",
+    "website": "https://www.joyalukkas.in",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "reliance-jewels",
+    "name": "Reliance Jewels",
+    "website": "https://www.reliancejewels.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "pc-jeweller",
+    "name": "PC Jeweller",
+    "website": "https://www.pcjeweller.com",
+    "notes": "India jewellery brand (larger)."
+  },
+  {
+    "slug": "orra",
+    "name": "ORRA",
+    "website": "https://www.orra.co.in",
+    "notes": "India jewellery brand (larger)."
+  },
+
+  {
+    "slug": "aashirs",
+    "name": "Aashirs",
+    "website": "https://aashirs.com",
+    "notes": "Bengaluru-based demi-fine jewellery brand with online store."
+  },
+  {
+    "slug": "loveshinecollections",
+    "name": "LoveShine Collections",
+    "website": "https://loveshinecollections.com",
+    "notes": "Bengaluru-based jewellery brand (Instagram-first) with online store."
+  },
+  {
+    "slug": "sandook",
+    "name": "Sandook",
+    "website": "https://sandook.in",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "atikollectionz",
+    "name": "Atikollectionz",
+    "website": "https://atikollectionz.com",
+    "notes": "Bengaluru-based fashion jewellery brand with online store."
+  },
+  {
+    "slug": "calistaindia",
+    "name": "Calista",
+    "website": "https://calistaindia.com",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "trenzify",
+    "name": "Trenzify Store",
+    "website": "https://trenzifystore.com",
+    "notes": "Bengaluru-based fashion/American-diamond jewellery store with online store."
+  },
+  {
+    "slug": "beaded-treasures",
+    "name": "Beaded Treasures",
+    "website": "https://beadedtreasures.in",
+    "notes": "Bengaluru-based beaded jewellery brand with online store."
+  },
+  {
+    "slug": "hs925",
+    "name": "HS925",
+    "website": "https://hs925.com",
+    "notes": "Bengaluru-based 925 silver jewellery brand with online store."
+  },
+  {
+    "slug": "srivaru-silver",
+    "name": "Srivaru Silver",
+    "website": "https://srivarusilver.com",
+    "notes": "Bengaluru-based silver jewellery brand with online store."
+  },
+  {
+    "slug": "puresilver",
+    "name": "PureSilver",
+    "website": "https://puresilver.io",
+    "notes": "Bengaluru-based 925 silver brand with online store."
+  },
+  {
+    "slug": "siyaza",
+    "name": "Siyaza",
+    "website": "https://siyaza.com",
+    "notes": "American-diamond imitation jewellery brand with online store (Karnataka-hosted)."
+  },
+  {
+    "slug": "gldn-india",
+    "name": "GLDN (India)",
+    "website": "https://www.gldn.in",
+    "notes": "Bengaluru-based anti-tarnish jewellery brand with online store."
+  },
+  {
+    "slug": "adaaz",
+    "name": "Adaaz",
+    "website": "https://adaaz.in",
+    "notes": "Bengaluru-based anti-tarnish jewellery brand with online store."
+  },
+  {
+    "slug": "aurajewelry",
+    "name": "Aura Jewelry",
+    "website": "https://aurajewelry.in",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "ekaa-jewells-india",
+    "name": "Ekaa Jewells (India)",
+    "website": "https://ekaajewells.in",
+    "notes": "India jewellery brand (Instagram-first) with online store."
+  },
+  {
+    "slug": "jc-silver-jewellery",
+    "name": "JC Silver Jewellery",
+    "website": "https://jcsilverjewellery.com",
+    "notes": "Bengaluru-based silver jewellery brand with online store."
+  },
+  {
+    "slug": "kamar",
+    "name": "KAMAR",
+    "website": "https://kamarjewellery.com",
+    "notes": "Bengaluru-based jewellery brand with online store."
+  },
+  {
+    "slug": "chicjewel",
+    "name": "Chicjewel",
+    "website": "https://chicjewel.store",
+    "notes": "Bengaluru-based jewellery brand (Instagram-first) with online store."
+  },
+  {
+    "slug": "minimae",
+    "name": "Minimae",
+    "website": "https://minimae.com",
+    "notes": "India minimalist jewellery brand with online store."
+  },
+  {
+    "slug": "amrrutam",
+    "name": "Amrrutam",
+    "website": "https://www.amrrutam.com",
+    "notes": "India jewellery brand with online store."
+  },
+  {
+    "slug": "cosmos-diamonds",
+    "name": "Cosmos Diamonds",
+    "website": "https://cosmosdiamonds.in",
+    "notes": "India lab-grown diamond jewellery brand with online store."
+  },
+  {
+    "slug": "wondr-diamonds",
+    "name": "Wondr Diamonds",
+    "website": "https://wondrdiamonds.com",
+    "notes": "India lab-grown diamond jewellery brand with online store."
+  },
+  {
+    "slug": "wahe",
+    "name": "WAHE Jewellery",
+    "website": "https://wahejewellery.com",
+    "notes": "India lab-grown diamond jewellery brand with online store."
+  },
+  {
+    "slug": "bcos-its-silver",
+    "name": "BCOS It's Silver",
+    "website": "https://bcositssilver.com",
+    "notes": "India silver jewellery brand with online store."
+  },
+  {
+    "slug": "zilmor",
+    "name": "Zilmor",
+    "website": "https://zilmor.com",
+    "notes": "India American-diamond jewellery store with online store."
+  },
+  {
+    "slug": "silvercarats",
+    "name": "SilverCarats",
+    "website": "https://silvercarats.in",
+    "notes": "India 925 silver + CZ jewellery brand with online store."
+  },
+  {
+    "slug": "kochuz-jewellery",
+    "name": "Kochuz Jewellery",
+    "website": "https://kochuzjewellery.com",
+    "notes": "India fashion jewellery brand with online store."
+  },
+  {
+    "slug": "trisu",
+    "name": "Trisu",
+    "website": "https://www.trisu.in",
+    "notes": "India 925 silver + CZ jewellery brand with online store."
+  }
+]

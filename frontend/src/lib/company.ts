@@ -6,6 +6,18 @@
 const HOST_TO_COMPANY: Record<string, string> = {
   "bluestone.com": "bluestone",
   "www.bluestone.com": "bluestone",
+  "giva.co": "giva",
+  "melorra.com": "melorra",
+  "kushals.com": "kushals",
+  "shopklarity.com": "klarity",
+  "quirksmith.com": "quirksmith",
+  "iyalsilvers.com": "iyal-silvers",
+  "onyadiamonds.com": "onya",
+  "aukerajewellery.com": "aukera",
+  "caratcult.com": "caratcult",
+  "shravia.com": "shravia",
+  "houseofmila.co": "houseofmila",
+  "ishhaara.com": "ishhaara",
 };
 
 /**

@@ -11,15 +11,15 @@ export default function Home() {
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-14">
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <header className="rounded-2xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-10 shadow-2xl">
-        <p className="text-xs font-medium tracking-[0.2em] text-blue-300/90">
+      <header className="rounded-2xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-10 shadow-sm">
+        <p className="text-xs font-medium tracking-[0.2em] text-blue-600">
           AI VIDEO ADS FOR JEWELLERY BRANDS
         </p>
-        <h1 className="mt-3 text-3xl font-semibold text-zinc-100 sm:text-4xl lg:text-5xl">
+        <h1 className="mt-3 text-3xl font-semibold text-zinc-900 sm:text-4xl lg:text-5xl">
           Turn your product catalog into
           <br className="hidden sm:block" /> scroll-stopping video ads.
         </h1>
-        <p className="mt-5 max-w-3xl text-base leading-relaxed text-zinc-300/90">
+        <p className="mt-5 max-w-3xl text-base leading-relaxed text-zinc-500">
           Video production is expensive, slow, and impossible to scale across hundreds of SKUs.
           We fix that. Paste a product link, and our AI extracts the images, writes the script,
           and generates a cinematic ad — ready for social, marketplaces, or your website.
@@ -28,7 +28,7 @@ export default function Home() {
 
       {/* ── Video Showcase ───────────────────────────────────────── */}
       <section className="mt-10">
-        <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
           {SAMPLE_VIDEO_URL ? (
             <video
               src={SAMPLE_VIDEO_URL}
@@ -39,11 +39,11 @@ export default function Home() {
               className="aspect-square w-full object-contain sm:aspect-video"
             />
           ) : (
-            <div className="flex aspect-square items-center justify-center bg-zinc-950/60 sm:aspect-video">
+            <div className="flex aspect-square items-center justify-center bg-zinc-100/60 sm:aspect-video">
               <div className="text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-zinc-200 bg-white shadow-sm">
                   <svg
-                    className="h-7 w-7 text-blue-400"
+                    className="h-7 w-7 text-blue-500"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -57,14 +57,14 @@ export default function Home() {
             </div>
           )}
         </div>
-        <p className="mt-3 text-center text-xs text-zinc-500">
+        <p className="mt-3 text-center text-xs text-zinc-400">
           Generated from a product page. No shoot. No editing. No crew.
         </p>
       </section>
 
       {/* ── How It Works ─────────────────────────────────────────── */}
       <section className="mt-14">
-        <h2 className="text-center text-lg font-semibold text-zinc-100">
+        <h2 className="text-center text-lg font-semibold text-zinc-900">
           How it works
         </h2>
         <div className="mt-8 grid gap-6 sm:grid-cols-3">
@@ -88,7 +88,7 @@ export default function Home() {
 
       {/* ── Benefits ─────────────────────────────────────────────── */}
       <section className="mt-14">
-        <h2 className="text-center text-lg font-semibold text-zinc-100">
+        <h2 className="text-center text-lg font-semibold text-zinc-900">
           Why jewellery brands need this
         </h2>
         <div className="mt-8 grid gap-5 sm:grid-cols-2">
@@ -113,7 +113,7 @@ export default function Home() {
 
       {/* ── Use Cases ────────────────────────────────────────────── */}
       <section className="mt-14">
-        <h2 className="text-center text-lg font-semibold text-zinc-100">
+        <h2 className="text-center text-lg font-semibold text-zinc-900">
           Where it fits
         </h2>
         <div className="mt-8 grid gap-5 sm:grid-cols-3">
@@ -138,7 +138,7 @@ export default function Home() {
       </Suspense>
 
       {/* ── Footer ───────────────────────────────────────────────── */}
-      <footer className="mt-10 text-center text-xs text-zinc-500">
+      <footer className="mt-10 text-center text-xs text-zinc-400">
         This is a technology demonstration. Outputs are AI-generated and may vary.
       </footer>
     </main>
@@ -157,30 +157,30 @@ function Step({
   body: string;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-center">
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-blue-600/20 text-sm font-bold text-blue-400">
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">
         {number}
       </div>
-      <h3 className="mt-4 text-sm font-semibold text-zinc-100">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{body}</p>
+      <h3 className="mt-4 text-sm font-semibold text-zinc-900">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-500">{body}</p>
     </div>
   );
 }
 
 function Benefit({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-6">
-      <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-300/80">{body}</p>
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-6">
+      <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-500">{body}</p>
     </div>
   );
 }
 
 function UseCase({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-      <h3 className="text-sm font-semibold text-zinc-200">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{body}</p>
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6">
+      <h3 className="text-sm font-semibold text-zinc-800">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-500">{body}</p>
     </div>
   );
 }

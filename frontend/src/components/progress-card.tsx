@@ -9,10 +9,10 @@ type Props = {
 };
 
 const STATUS_COLORS: Record<VideoRun["status"], string> = {
-  queued: "text-yellow-400",
-  processing: "text-blue-400",
-  completed: "text-green-400",
-  failed: "text-red-400",
+  queued: "text-yellow-600",
+  processing: "text-blue-600",
+  completed: "text-green-600",
+  failed: "text-red-600",
 };
 
 // Pipeline steps shown during processing
@@ -124,9 +124,9 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
   return (
     <div className="space-y-4">
       {/* Progress bar */}
-      <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden">
+      <div className="h-1 w-full rounded-full bg-zinc-200 overflow-hidden">
         <div
-          className={`h-full rounded-full bg-gradient-to-r from-blue-600 via-blue-400 to-cyan-400 transition-all duration-500 ease-out${isOvertime ? " animate-pulse" : ""}`}
+          className={`h-full rounded-full bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 transition-all duration-500 ease-out${isOvertime ? " animate-pulse" : ""}`}
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -143,7 +143,7 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
               key={step.label}
               className={`flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all duration-500 ${
                 isActive
-                  ? "bg-blue-500/10 border border-blue-500/20"
+                  ? "bg-blue-50 border border-blue-200"
                   : isCompleted
                   ? "opacity-60"
                   : "opacity-0 h-0 py-0 overflow-hidden"
@@ -159,10 +159,10 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
               <div
                 className={`flex-shrink-0 ${
                   isActive
-                    ? "text-blue-400 animate-pulse"
+                    ? "text-blue-600 animate-pulse"
                     : isCompleted
-                    ? "text-green-400"
-                    : "text-zinc-600"
+                    ? "text-green-600"
+                    : "text-zinc-300"
                 }`}
               >
                 {isCompleted ? (
@@ -178,10 +178,10 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
               <span
                 className={`text-sm ${
                   isActive
-                    ? "text-blue-300 font-medium"
+                    ? "text-blue-700 font-medium"
                     : isCompleted
                     ? "text-zinc-400 line-through"
-                    : "text-zinc-600"
+                    : "text-zinc-300"
                 }`}
               >
                 {step.label}
@@ -197,7 +197,7 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
               {/* Active spinner */}
               {isActive && (
                 <div className="ml-auto flex-shrink-0">
-                  <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
                 </div>
               )}
             </div>
@@ -206,12 +206,12 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
       </div>
 
       {/* Elapsed time */}
-      <div className="flex items-center justify-between text-xs text-zinc-500">
+      <div className="flex items-center justify-between text-xs text-zinc-400">
         <span>
           {Math.floor(elapsed / 60000)}:{String(Math.floor((elapsed % 60000) / 1000)).padStart(2, "0")} elapsed
         </span>
         {isOvertime ? (
-          <span className="text-amber-400/80">Taking longer than usual &mdash; feel free to browse your other videos while we finish up</span>
+          <span className="text-amber-600">Taking longer than usual &mdash; feel free to browse your other videos while we finish up</span>
         ) : (
           <span>May take a few minutes - take a look around or try another item while you wait</span>
         )}
@@ -219,11 +219,11 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
 
       {/* Overtime notice */}
       {isOvertime && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-          <svg className="mt-0.5 w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <svg className="mt-0.5 w-4 h-4 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p className="text-sm text-amber-300/80">
+          <p className="text-sm text-amber-700">
             This is taking longer than expected. Your video is still being generated &mdash; check back shortly or explore other items in your history.
           </p>
         </div>
@@ -234,14 +234,14 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
 
 export function ProgressCard({ run, onRefresh }: Props) {
   return (
-    <div className="flex h-full flex-col rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+    <div className="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-medium text-zinc-100">
+          <h3 className="font-medium text-zinc-900">
             {run.product_title || "Loading product details..."}
           </h3>
           {run.product_category && (
-            <span className="text-sm text-zinc-500 capitalize">
+            <span className="text-sm text-zinc-400 capitalize">
               {run.product_category}
             </span>
           )}
@@ -259,7 +259,7 @@ export function ProgressCard({ run, onRefresh }: Props) {
           {run.status === "processing" && (
             <button
               onClick={onRefresh}
-              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors border border-zinc-700 rounded px-2 py-1 hover:bg-zinc-800"
+              className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors border border-zinc-200 rounded px-2 py-1 hover:bg-zinc-50"
             >
               Refresh
             </button>
@@ -269,9 +269,9 @@ export function ProgressCard({ run, onRefresh }: Props) {
 
       {/* Queued state */}
       {run.status === "queued" && (
-        <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
-          <div className="w-4 h-4 border-2 border-yellow-400/30 border-t-yellow-400 rounded-full animate-spin" />
-          <span className="text-sm text-yellow-300/80">Waiting in queue...</span>
+        <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-yellow-50 border border-yellow-200">
+          <div className="w-4 h-4 border-2 border-yellow-200 border-t-yellow-600 rounded-full animate-spin" />
+          <span className="text-sm text-yellow-700">Waiting in queue...</span>
         </div>
       )}
 
@@ -291,7 +291,7 @@ export function ProgressCard({ run, onRefresh }: Props) {
             className="h-full w-full rounded-lg object-contain"
             poster={run.thumbnail_url || undefined}
           />
-          <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-white/10 bg-black/40 px-3 py-1 text-[11px] font-medium tracking-wide text-white/90 backdrop-blur-sm">
+          <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-black/10 bg-white/80 px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-600 backdrop-blur-sm">
             Not for commercial use
           </div>
         </div>
@@ -299,14 +299,14 @@ export function ProgressCard({ run, onRefresh }: Props) {
 
       {/* Failed state */}
       {run.status === "failed" && (
-        <div className="rounded-lg bg-red-500/5 border border-red-500/10 p-4 space-y-3">
+        <div className="rounded-lg bg-red-50 border border-red-200 p-4 space-y-3">
           <div className="flex items-start gap-3">
-            <svg className="mt-0.5 w-5 h-5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="mt-0.5 w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
             <div>
-              <p className="text-sm font-medium text-red-300">Video generation didn&apos;t complete</p>
-              <p className="mt-1 text-xs text-red-300/70">
+              <p className="text-sm font-medium text-red-700">Video generation didn&apos;t complete</p>
+              <p className="mt-1 text-xs text-red-600/70">
                 {run.error_message || "An unexpected issue occurred during generation. This can happen occasionally with AI-powered video creation."}
               </p>
             </div>
@@ -320,15 +320,19 @@ export function ProgressCard({ run, onRefresh }: Props) {
 }
 
 export function ReferencePanel({ run }: { run: VideoRun }) {
-  const images = run.input_images ?? [];
+  const allImages = run.input_images ?? [];
+  const images = allImages.slice(0, 4);
 
-  if (images.length === 0) return null;
+  if (allImages.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-      <h3 className="text-sm font-medium text-zinc-300 mb-3">
+    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+      <h3 className="text-sm font-medium text-zinc-600 mb-3">
         Reference Images{" "}
-        <span className="text-xs text-zinc-500 font-normal">({images.length})</span>
+        <span className="text-xs text-zinc-400 font-normal">
+          ({images.length}
+          {allImages.length > images.length ? ` of ${allImages.length}` : ""})
+        </span>
       </h3>
 
       <div className="grid grid-cols-2 gap-2">
@@ -344,7 +348,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
               className="group block"
               title={label}
             >
-              <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+              <div className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
                 <img
                   src={url}
                   alt={label}
@@ -352,7 +356,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
                   loading="lazy"
                 />
               </div>
-              <p className="mt-1 text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors text-center">
+              <p className="mt-1 text-xs text-zinc-400 group-hover:text-zinc-600 transition-colors text-center">
                 {label}
               </p>
             </a>
@@ -365,7 +369,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
           href={run.source_url}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 block text-xs text-zinc-400 hover:text-zinc-200 transition-colors underline underline-offset-2"
+          className="mt-3 block text-xs text-zinc-500 hover:text-zinc-700 transition-colors underline underline-offset-2"
         >
           View product page
         </a>

@@ -345,11 +345,11 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {showDisclaimer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="mx-4 max-w-lg rounded-2xl border border-zinc-700 bg-zinc-900 p-8 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="mx-4 max-w-lg rounded-2xl border border-zinc-200 bg-white p-8 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <svg
-                className="w-6 h-6 text-blue-400 flex-shrink-0"
+                className="w-6 h-6 text-blue-500 flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -361,20 +361,20 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
                   d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
                 />
               </svg>
-              <h2 className="text-lg font-semibold text-zinc-100">Demo Notice</h2>
+              <h2 className="text-lg font-semibold text-zinc-900">Demo Notice</h2>
             </div>
-            <div className="space-y-3 text-sm text-zinc-400 leading-relaxed">
+            <div className="space-y-3 text-sm text-zinc-500 leading-relaxed">
               <p>
-                This is a <span className="text-zinc-200 font-medium">technology demo</span>, not a
+                This is a <span className="text-zinc-800 font-medium">technology demo</span>, not a
                 production environment.
               </p>
               <p>
                 Any on-screen people are{" "}
-                <span className="text-zinc-200 font-medium">generic synthetic personas</span> used
+                <span className="text-zinc-800 font-medium">generic synthetic personas</span> used
                 only to demonstrate video generation.
               </p>
-              <p className="text-zinc-400">
-                Generated videos are <span className="text-zinc-200 font-medium">not for commercial use</span>.
+              <p>
+                Generated videos are <span className="text-zinc-800 font-medium">not for commercial use</span>.
               </p>
             </div>
             <button
@@ -391,10 +391,10 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
         <section className="mx-auto w-full max-w-4xl mb-3 flex-shrink-0">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-semibold text-zinc-100">Video Demo</h1>
-              <p className="text-xs text-zinc-500">Company: {companyLabel}</p>
+              <h1 className="text-lg font-semibold text-zinc-900">Video Demo</h1>
+              <p className="text-xs text-zinc-400">Company: {companyLabel}</p>
             </div>
-            <span className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-300">
+            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-500">
               Shared demo environment
             </span>
           </div>
@@ -408,9 +408,9 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
           />
 
           {error && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
               <svg
-                className="mt-0.5 w-5 h-5 text-red-400 flex-shrink-0"
+                className="mt-0.5 w-5 h-5 text-red-500 flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -423,11 +423,11 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
                 />
               </svg>
               <div className="flex-1">
-                <p className="text-sm text-red-300">{error}</p>
+                <p className="text-sm text-red-600">{error}</p>
               </div>
               <button
                 onClick={() => setError("")}
-                className="text-red-400/60 hover:text-red-300 transition-colors"
+                className="text-red-400 hover:text-red-600 transition-colors"
               >
                 <svg
                   className="w-4 h-4"
@@ -449,7 +449,7 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
 
         <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[2fr_3fr_2fr]">
           <aside className="order-2 lg:order-1 min-h-0 overflow-y-auto">
-            <h2 className="mb-3 text-sm font-medium text-zinc-400">History</h2>
+            <h2 className="mb-3 text-sm font-medium text-zinc-500">History</h2>
             <HistoryList
               runs={runs}
               onSelect={handleSelectRun}
@@ -461,8 +461,8 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
             {activeRun ? (
               <ProgressCard run={activeRun} onRefresh={handleRefresh} />
             ) : (
-              <div className="rounded-xl border border-dashed border-zinc-800 p-12 text-center">
-                <p className="text-zinc-500">Paste a product URL to generate a video ad</p>
+              <div className="rounded-xl border border-dashed border-zinc-300 p-12 text-center">
+                <p className="text-zinc-400">Paste a product URL to generate a video ad</p>
               </div>
             )}
           </section>

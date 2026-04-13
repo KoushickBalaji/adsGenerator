@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geist.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100 font-[family-name:var(--font-geist)]">
+      <body className="min-h-full flex flex-col bg-white text-zinc-900 font-[family-name:var(--font-geist)]">
         {children}
       </body>
     </html>

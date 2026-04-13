@@ -1,0 +1,62 @@
+[
+  {
+    "slug": "giva",
+    "name": "GIVA",
+    "website": "https://www.giva.co",
+    "notes": "Bengaluru-headquartered D2C jewellery brand (large catalog + strong social)."
+  },
+  {
+    "slug": "melorra",
+    "name": "Melorra",
+    "website": "https://www.melorra.com",
+    "notes": "Bengaluru-based online jewellery brand with frequent new design drops (high-volume content needs)."
+  },
+  {
+    "slug": "bluestone",
+    "name": "BlueStone",
+    "website": "https://www.bluestone.com",
+    "notes": "Bengaluru-based online jeweller with a large SKU catalog."
+  },
+  {
+    "slug": "kushals",
+    "name": "Kushal's Fashion Jewellery",
+    "website": "https://www.kushals.com",
+    "notes": "Bengaluru-based fashion jewellery brand with wide variety (good fit for high-volume video ads)."
+  },
+  {
+    "slug": "klarity",
+    "name": "Klarity",
+    "website": "https://shopklarity.com",
+    "notes": "Bengaluru-headquartered 92.5 silver brand with an e-commerce catalog."
+  },
+  {
+    "slug": "quirksmith",
+    "name": "Quirksmith",
+    "website": "https://www.quirksmith.com",
+    "notes": "Bengaluru-based silver jewellery brand with frequent launches and strong Instagram-driven discovery."
+  },
+  {
+    "slug": "iyal-silvers",
+    "name": "Iyal Silvers",
+    "website": "https://iyalsilvers.com",
+    "notes": "Bengaluru-based 925 silver brand (started via Instagram) with an online store."
+  },
+  {
+    "slug": "onya",
+    "name": "ONYA",
+    "website": "https://www.onyadiamonds.com",
+    "notes": "Bengaluru-based lab-grown diamond jewellery startup with retail presence in the city."
+  },
+  {
+    "slug": "aukera",
+    "name": "Aukera",
+    "website": "https://aukerajewellery.com",
+    "notes": "Lab-grown diamond jewellery brand with registered office in Bengaluru."
+  },
+  {
+    "slug": "caratcult",
+    "name": "CaratCult",
+    "website": "https://caratcult.com",
+    "notes": "Bengaluru-based lab-grown diamond jewellery brand (Basavanagudi address)."
+  }
+]
