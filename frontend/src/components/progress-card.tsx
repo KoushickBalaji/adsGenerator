@@ -238,7 +238,19 @@ export function ProgressCard({ run, onRefresh }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-medium text-zinc-900">
-            {run.product_title || "Loading product details..."}
+            {run.source_url ? (
+              <a
+                href={run.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:underline underline-offset-2"
+                title="Open product page"
+              >
+                {run.product_title || "Loading product details..."}
+              </a>
+            ) : (
+              (run.product_title || "Loading product details...")
+            )}
           </h3>
           {run.product_category && (
             <span className="text-sm text-zinc-400 capitalize">

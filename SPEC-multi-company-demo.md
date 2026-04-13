@@ -34,6 +34,7 @@ Frontend
 - Company demo route: `frontend/src/app/demo/[company]`.
 - Calls Supabase Edge Functions:
   - `create-run` to start a run
+  - `random-product` to fetch a random product URL (for “Try a random item”)
   - `refresh-run` as a polling fallback
 - Subscribes to Supabase Realtime updates on `public.video_runs`.
 
@@ -42,6 +43,7 @@ Backend
 Supabase Edge Functions:
 
 - `create-run`: orchestrates scrape → Gemini prompt → Kling job.
+- `random-product`: discovers a random product URL via the company sitemap (best-effort).
 - `kling-webhook`: marks completion and uploads MP4 to Supabase Storage.
 - `refresh-run`: polling fallback (queries Kling by `provider_job_id`).
 

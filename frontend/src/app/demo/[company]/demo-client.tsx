@@ -60,6 +60,12 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
     loadHistory();
   }, [loadHistory]);
 
+  // Make it obvious that sample runs exist: auto-select the newest run.
+  useEffect(() => {
+    if (activeRunId || runs.length === 0) return;
+    setActiveRun(runs[0]);
+  }, [activeRunId, runs]);
+
   // Auto-start generation when redirected from the landing page with a URL
   useEffect(() => {
     if (autostart && initialUrl && !autostartFired.current) {
@@ -342,6 +348,28 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
     }
   }
 
+  const handleTryRandom = useCallback(async () => {
+    const res = await supabase.functions.invoke("random-product", {
+      body: {
+        companySlug: normalizedCompanySlug,
+        categories: ["ring", "necklace", "earring"],
+      },
+    });
+
+    if (res.error) {
+      const serverMessage = await readEdgeFunctionError(res.response);
+      const fallbackMessage =
+        res.error.message === "Edge Function returned a non-2xx status code"
+          ? "Couldn't find a random product right now. Please paste a product URL instead."
+          : res.error.message;
+      throw new Error(serverMessage || fallbackMessage);
+    }
+
+    const { url } = res.data as { url?: string };
+    if (!url) throw new Error("Couldn't find a random product right now.");
+    return url;
+  }, [normalizedCompanySlug]);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {showDisclaimer && (
@@ -395,9 +423,10 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
 
           <UrlInput
             onSubmit={handleGenerate}
+            onTryRandom={handleTryRandom}
             disabled={starting}
             placeholder={`https://www.${companyLabel}.com/product/...`}
-            helperText={`Paste a ${companyLabel} product URL to generate a short video.`}
+            helperText={`Paste a ${companyLabel} product URL to generate a short video ad (or try a random item).`}
             initialValue={initialUrl}
           />
 
@@ -456,7 +485,9 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
               <ProgressCard run={activeRun} onRefresh={handleRefresh} />
             ) : (
               <div className="rounded-xl border border-dashed border-zinc-300 p-12 text-center">
-                <p className="text-zinc-400">Paste a product URL to generate a video ad</p>
+                <p className="text-zinc-500">
+                  Select a sample from History, try a random item, or paste a product URL to generate a video ad.
+                </p>
               </div>
             )}
           </section>

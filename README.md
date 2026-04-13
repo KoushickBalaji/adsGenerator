@@ -30,6 +30,7 @@ This repo is a **shared demo sandbox** (not production multi-tenant). It support
 
 ## High-Level Flow
 
+0. (Optional) Frontend calls `random-product` with `{ companySlug }` to get a random product URL when the user clicks “Try a random item”
 1. Frontend calls `create-run` with `{ companySlug, url, runId? }`
 2. `create-run` inserts a `video_runs` row, scrapes the product page, generates a Gemini prompt, calls Kling, then updates the run with:
    - `provider_job_id`
