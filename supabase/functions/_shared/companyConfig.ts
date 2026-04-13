@@ -113,7 +113,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -144,7 +144,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -175,7 +175,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -206,7 +206,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -237,7 +237,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -268,7 +268,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -299,7 +299,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -330,7 +330,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -361,7 +361,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -392,7 +392,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -423,7 +423,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -454,7 +454,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -486,7 +486,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "jewellery_generic_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },
@@ -516,7 +516,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
       style: "product_only_v1",
     },
     limits: {
-      maxConcurrentRuns: 1,
+      maxConcurrentRuns: 3,
       maxLifetimeSuccessfulVideos: 10,
       maxAttemptsPerDay: 30,
     },

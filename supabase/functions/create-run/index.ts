@@ -23,6 +23,9 @@ const CORS_HEADERS = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Demo-wide concurrency cap (shared demo environment + Kling upstream limits).
+const GLOBAL_MAX_CONCURRENT_RUNS = 5;
+
 // Best-effort anti-repeat for per-company element IDs (Edge Functions may scale across isolates).
 const lastPickedOverrideElementIdByCompany: Record<string, string> = {};
 
@@ -164,7 +167,22 @@ serve(async (req) => {
       }
     }
 
-    // Step 1: Basic concurrency guard (keep UX simple; no explicit limit in the UI)
+    // Step 3: Global concurrency guard (protects shared upstream services like Kling).
+    const { count: globalActiveCount, error: globalCountError } = await supabase
+      .from("video_runs")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["queued", "processing"]);
+
+    if (globalCountError) {
+      console.warn("[step 3] Could not check global active runs count:", globalCountError);
+    } else if ((globalActiveCount ?? 0) >= GLOBAL_MAX_CONCURRENT_RUNS) {
+      return jsonResponse(
+        { error: "We're a bit busy right now. Please try again in a few minutes." },
+        429
+      );
+    }
+
+    // Step 4: Per-company concurrency guard (keeps per-demo UX predictable).
     const { count: activeCount, error: countError } = await supabase
       .from("video_runs")
       .select("id", { count: "exact", head: true })
@@ -172,7 +190,7 @@ serve(async (req) => {
       .in("status", ["queued", "processing"]);
 
     if (countError) {
-      console.warn("[step 0] Could not check active runs count:", countError);
+      console.warn("[step 4] Could not check active runs count:", countError);
     } else if ((activeCount ?? 0) >= config.limits.maxConcurrentRuns) {
       return jsonResponse(
         { error: "We're a bit busy right now. Please try again in a few minutes." },

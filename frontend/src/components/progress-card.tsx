@@ -285,6 +285,7 @@ export function ProgressCard({ run, onRefresh }: Props) {
         <div className="min-h-0 flex-1 relative">
           <video
             src={run.output_video_url}
+            preload="auto"
             controls
             controlsList="nodownload noremoteplayback"
             disablePictureInPicture

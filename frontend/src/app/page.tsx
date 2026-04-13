@@ -33,6 +33,7 @@ export default function Home() {
             <video
               src={SAMPLE_VIDEO_URL}
               poster={SAMPLE_VIDEO_POSTER || undefined}
+              preload="auto"
               controls
               controlsList="nodownload noremoteplayback"
               disablePictureInPicture

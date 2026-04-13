@@ -88,6 +88,9 @@ Per-company behavior is defined in `companyConfig.ts` and includes:
   - `limits.maxLifetimeSuccessfulVideos`
   - `limits.maxAttemptsPerDay` (optional)
 
+In addition to per-company limits, `create-run` enforces a demo-wide concurrency cap across *all* companies
+(currently **5** active runs total).
+
 The backend rejects:
 
 - Unknown `companySlug` (“Invalid demo link.”)

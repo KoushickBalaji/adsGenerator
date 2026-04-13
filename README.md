@@ -100,7 +100,10 @@ Each company config defines:
 - `scraper.maxReferenceImages`: max candidate images extracted (up to 12)
 - Kling defaults and model candidates
 - Prompt policy (`requiresAmbassador`, `style`)
-- Spend/abuse limits (concurrency, lifetime successful videos, optional daily attempt cap)
+- Spend/abuse limits (per-company concurrency, lifetime successful videos, optional daily attempt cap)
+
+The backend also enforces a demo-wide concurrency cap across *all* companies (currently **5** active runs total),
+in addition to each company’s `limits.maxConcurrentRuns` (currently **3** active runs per company).
 
 The backend rejects unsupported `companySlug` (returns “Invalid demo link.”) and rejects URLs whose hostname is not in that company’s `allowedHosts` list.
 
