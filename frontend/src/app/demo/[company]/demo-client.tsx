@@ -396,7 +396,7 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
           <UrlInput
             onSubmit={handleGenerate}
             disabled={starting}
-            placeholder="https://www.${companyLabel}.com/product/..."
+            placeholder={`https://www.${companyLabel}.com/product/...`}
             helperText={`Paste a ${companyLabel} product URL to generate a short video.`}
             initialValue={initialUrl}
           />
