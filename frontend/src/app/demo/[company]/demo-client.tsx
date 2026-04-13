@@ -390,18 +390,14 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold text-zinc-900">Video Demo</h1>
-              <p className="text-xs text-zinc-400">Company: {companyLabel}</p>
             </div>
-            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-500">
-              Shared demo environment
-            </span>
           </div>
 
           <UrlInput
             onSubmit={handleGenerate}
             disabled={starting}
-            placeholder="https://www.example.com/product/..."
-            helperText={`Paste a ${companyLabel} product URL to generate a short video ad.`}
+            placeholder="https://www.${companyLabel}.com/product/..."
+            helperText={`Paste a ${companyLabel} product URL to generate a short video.`}
             initialValue={initialUrl}
           />
 
