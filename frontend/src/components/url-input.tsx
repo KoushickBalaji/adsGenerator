@@ -68,34 +68,35 @@ export function UrlInput({
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="flex gap-3">
+      {onTryRandom && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={handleTryRandom}
+            disabled={busy}
+            className="w-full max-w-xs rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600"
+          >
+            {findingRandom ? "Finding item..." : "Try a random item"}
+          </button>
+        </div>
+      )}
+
+      <div className={`flex items-center justify-center gap-3 ${onTryRandom ? "mt-3" : ""}`}>
         <input
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder={placeholder || "https://example.com/product/..."}
           disabled={busy}
-          className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+          className="w-full max-w-xl rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
         />
-        <div className="flex flex-col gap-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600"
-          >
-            {disabled ? "Generating..." : "Generate Video"}
-          </button>
-          {onTryRandom && (
-            <button
-              type="button"
-              onClick={handleTryRandom}
-              disabled={busy}
-              className="rounded-lg border border-zinc-200 bg-white px-6 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50"
-            >
-              {findingRandom ? "Finding item..." : "Try a random item"}
-            </button>
-          )}
-        </div>
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600"
+        >
+          {disabled ? "Generating..." : "Generate Video"}
+        </button>
       </div>
       {error ? (
         <p className="mt-2 text-sm font-medium text-red-500">{error}</p>

@@ -68,6 +68,18 @@ async function fetchText(url: string, timeoutMs: number): Promise<string> {
   }
 }
 
+function extractSitemapUrlsFromRobots(robotsTxt: string): string[] {
+  return robotsTxt
+    .split(/\r?\n/g)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => {
+      const m = l.match(/^sitemap:\s*(.+)\s*$/i);
+      return m ? m[1].trim() : "";
+    })
+    .filter(Boolean);
+}
+
 function isProbablyProductUrl(rawUrl: string): boolean {
   const lower = rawUrl.toLowerCase();
   if (lower.endsWith(".xml")) return false;
@@ -102,16 +114,51 @@ function isPreferredCategory(url: string, categories: string[]): boolean {
   }
 }
 
-async function discoverRandomProductUrl(opts: {
-  allowedHosts: string[];
-  categories: string[];
-}): Promise<string> {
-  const allowedHost = opts.allowedHosts[0];
+async function discoverSitemapStartUrls(allowedHost: string, requestId: string): Promise<string[]> {
   const baseCandidates = [`https://${allowedHost}`, `https://www.${allowedHost}`];
   const sitemapPaths = ["/sitemap.xml", "/sitemap_index.xml", "/sitemapindex.xml"];
 
-  const sitemapStartUrls = baseCandidates.flatMap((base) =>
-    sitemapPaths.map((p) => `${base}${p}`)
+  const startUrls = new Set<string>();
+  for (const base of baseCandidates) {
+    for (const p of sitemapPaths) startUrls.add(`${base}${p}`);
+  }
+
+  // robots.txt fallback (some sites publish nonstandard sitemap URLs here)
+  for (const base of baseCandidates) {
+    const robotsUrl = `${base}/robots.txt`;
+    try {
+      const robotsTxt = await fetchText(robotsUrl, 6000);
+      const robotSitemaps = extractSitemapUrlsFromRobots(robotsTxt);
+      if (robotSitemaps.length > 0) {
+        console.log(
+          `[random-product][${requestId}] robots.txt sitemaps from ${robotsUrl}: ${robotSitemaps.length}`
+        );
+        for (const u of robotSitemaps) startUrls.add(u);
+      } else {
+        console.log(
+          `[random-product][${requestId}] robots.txt had no sitemaps: ${robotsUrl}`
+        );
+      }
+    } catch (err) {
+      console.log(
+        `[random-product][${requestId}] robots.txt fetch failed: ${robotsUrl}`,
+        err
+      );
+    }
+  }
+
+  return Array.from(startUrls);
+}
+
+async function discoverRandomProductUrl(opts: {
+  allowedHosts: string[];
+  categories: string[];
+  requestId: string;
+}): Promise<string> {
+  const allowedHost = opts.allowedHosts[0];
+  const sitemapStartUrls = await discoverSitemapStartUrls(allowedHost, opts.requestId);
+  console.log(
+    `[random-product][${opts.requestId}] sitemap start URLs: ${sitemapStartUrls.length}`
   );
 
   const seenSitemaps = new Set<string>();
@@ -127,10 +174,18 @@ async function discoverRandomProductUrl(opts: {
     try {
       xml = await fetchText(sitemapUrl, 8000);
     } catch {
+      console.log(
+        `[random-product][${opts.requestId}] sitemap fetch failed: ${sitemapUrl}`
+      );
       continue;
     }
 
-    for (const loc of extractLocs(xml)) {
+    const locs = extractLocs(xml);
+    console.log(
+      `[random-product][${opts.requestId}] sitemap locs: ${locs.length} (${sitemapUrl})`
+    );
+
+    for (const loc of locs) {
       if (loc.toLowerCase().endsWith(".xml")) {
         if (!seenSitemaps.has(loc) && toVisit.length < 20) toVisit.push(loc);
         continue;
@@ -151,6 +206,10 @@ async function discoverRandomProductUrl(opts: {
     }
   });
 
+  console.log(
+    `[random-product][${opts.requestId}] discovered urls: ${discoveredUrls.length}, unique candidates: ${candidates.length}`
+  );
+
   if (candidates.length === 0) {
     throw new Error(
       "Couldn't find a random product automatically for this website. Please paste a product URL instead."
@@ -159,13 +218,20 @@ async function discoverRandomProductUrl(opts: {
 
   const preferred = candidates.filter((u) => isPreferredCategory(u, opts.categories));
   const pool = preferred.length > 0 ? preferred : candidates;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  console.log(
+    `[random-product][${opts.requestId}] picked (${preferred.length > 0 ? "preferred" : "any"}): ${picked}`
+  );
+  return picked;
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
 
   try {
+    const requestId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+
     const body = await req.json().catch(() => ({}));
     const companySlug = normalizeCompanySlug((body as Record<string, unknown>).companySlug);
     const rawCategories = (body as Record<string, unknown>).categories;
@@ -180,9 +246,14 @@ serve(async (req) => {
       return jsonResponse({ error: "This demo link is not configured yet." }, 400);
     }
 
+    console.log(
+      `[random-product][${requestId}] start company=${companySlug} allowedHosts=${config.allowedHosts.join(",")}`
+    );
+
     const url = await discoverRandomProductUrl({
       allowedHosts: config.allowedHosts,
       categories,
+      requestId,
     });
 
     return jsonResponse({ url }, 200);
@@ -192,4 +263,3 @@ serve(async (req) => {
     return jsonResponse({ error: msg }, 500);
   }
 });
-
