@@ -76,7 +76,7 @@ export function UrlInput({
             disabled={busy}
             className="w-full max-w-xs rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600"
           >
-            {findingRandom ? "Finding item..." : "Try a random item"}
+            {findingRandom ? "Finding item..." : "Generate for a random item"}
           </button>
         </div>
       )}

@@ -426,7 +426,7 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
             onTryRandom={handleTryRandom}
             disabled={starting}
             placeholder={`https://www.${companyLabel}.com/product/...`}
-            helperText={`Paste a ${companyLabel} product URL to generate a short video ad (or try a random item).`}
+            helperText={`Paste a ${companyLabel} product link above to generate a video.`}
             initialValue={initialUrl}
           />
 
