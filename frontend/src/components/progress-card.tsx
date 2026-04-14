@@ -233,7 +233,7 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
   );
 }
 
-export function ProgressCard({ run, onRefresh }: Props) {
+export function ProgressCard({ run, onRefresh, prefetchedVideoSrc }: Props) {
   const [playbackStartedForRunId, setPlaybackStartedForRunId] = useState<string | null>(null);
   const hasStartedPlayback = playbackStartedForRunId === run.id;
 
