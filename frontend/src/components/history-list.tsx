@@ -38,12 +38,11 @@ export function HistoryList({ runs, onSelect, selectedId }: Props) {
             </span>
             <StatusBadge status={run.status} />
           </div>
-          <div className="mt-1 flex items-center gap-3 text-xs text-zinc-400">
-            <span>{new Date(run.created_at).toLocaleDateString()}</span>
-            {run.product_category && (
-              <span className="capitalize">{run.product_category}</span>
-            )}
-          </div>
+          {run.product_category && (
+            <div className="mt-1 text-xs text-zinc-400 capitalize">
+              {run.product_category}
+            </div>
+          )}
           {run.status === "completed" && run.thumbnail_url && (
             <img
               src={run.thumbnail_url}
