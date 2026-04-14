@@ -85,6 +85,7 @@ One row per company to hold:
 
 - `website_url`
 - website audit fields: `has_ecommerce`, `website_notes`, `scrape_profile` (JSONB)
+- optional demo UX helpers: `sample_product_urls` (up to ~10 curated product URLs for “Try a random item”)
 - prompt overrides: `prompt_style`, `requires_ambassador`, `creative_brief`, `variables`
 - ambassador overrides: `kling_element_ids` (optional; element IDs override prefix-based selection)
 

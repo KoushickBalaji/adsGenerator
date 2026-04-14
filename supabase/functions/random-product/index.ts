@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { getCompanyConfig } from "../_shared/companyConfig.ts";
+import { getServiceClient } from "../_shared/supabase.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +28,28 @@ function isHostnameAllowed(hostname: string, allowedHost: string): boolean {
   const h = hostname.trim().toLowerCase();
   const a = allowedHost.trim().toLowerCase();
   return h === a || h.endsWith(`.${a}`);
+}
+
+function filterSampleUrls(opts: {
+  sampleUrls: string[];
+  allowedHosts: string[];
+  categories: string[];
+}): { preferred: string[]; all: string[] } {
+  const cleaned = opts.sampleUrls
+    .map((u) => String(u || "").trim())
+    .filter(Boolean);
+
+  const all = cleaned.filter((raw) => {
+    try {
+      const u = new URL(raw);
+      return opts.allowedHosts.some((h) => isHostnameAllowed(u.hostname, h));
+    } catch {
+      return false;
+    }
+  });
+
+  const preferred = all.filter((u) => isPreferredCategory(u, opts.categories));
+  return { preferred, all };
 }
 
 function decodeXmlText(input: string): string {
@@ -63,6 +86,34 @@ async function fetchText(url: string, timeoutMs: number): Promise<string> {
     });
     if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
     return await res.text();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function fetchJson(
+  url: string,
+  timeoutMs: number
+): Promise<{ status: number; ok: boolean; json: unknown | null }> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (compatible; ads-generator-demo/1.0; +https://example.com)",
+        accept: "application/json,*/*",
+      },
+    });
+    const status = res.status;
+    if (!res.ok) return { status, ok: false, json: null };
+    try {
+      const json = (await res.json()) as unknown;
+      return { status, ok: true, json };
+    } catch {
+      return { status, ok: true, json: null };
+    }
   } finally {
     clearTimeout(t);
   }
@@ -114,6 +165,112 @@ function isPreferredCategory(url: string, categories: string[]): boolean {
   }
 }
 
+function extractShopifyHandlesFromHtml(html: string): string[] {
+  const out: string[] = [];
+  const re = /href=(?:"|')([^"']+)(?:"|')/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const href = (m[1] || "").trim();
+    if (!href) continue;
+    if (!href.startsWith("/products/")) continue;
+    const handle = href.split("/products/")[1]?.split(/[?#/]/)[0]?.trim();
+    if (handle) out.push(handle);
+  }
+  return Array.from(new Set(out));
+}
+
+async function tryShopifyProductsJson(opts: {
+  allowedHost: string;
+  categories: string[];
+  requestId: string;
+}): Promise<string | null> {
+  const baseCandidates = [
+    `https://${opts.allowedHost}`,
+    `https://www.${opts.allowedHost}`,
+  ];
+
+  for (const base of baseCandidates) {
+    const url = `${base}/products.json?limit=250`;
+    const res = await fetchJson(url, 8000);
+    console.log(
+      `[random-product][${opts.requestId}] try products.json: ${url} -> ${res.status}`
+    );
+    if (!res.ok || !res.json) continue;
+
+    const products = (res.json as { products?: unknown })?.products;
+    if (!Array.isArray(products) || products.length === 0) continue;
+
+    const handles = products
+      .map((p) => (p as { handle?: unknown })?.handle)
+      .filter((h): h is string => typeof h === "string" && h.trim().length > 0)
+      .map((h) => h.trim());
+
+    if (handles.length === 0) continue;
+
+    const categoryPool = products
+      .filter((p) => {
+        const title = String((p as { title?: unknown })?.title ?? "").toLowerCase();
+        const productType = String(
+          (p as { product_type?: unknown })?.product_type ?? ""
+        ).toLowerCase();
+        return opts.categories.some((c) => {
+          const cc = c.toLowerCase();
+          return title.includes(cc) || productType.includes(cc);
+        });
+      })
+      .map((p) => (p as { handle?: unknown })?.handle)
+      .filter((h): h is string => typeof h === "string" && h.trim().length > 0)
+      .map((h) => h.trim());
+
+    const pickedHandlePool = categoryPool.length > 0 ? categoryPool : handles;
+    const pickedHandle =
+      pickedHandlePool[Math.floor(Math.random() * pickedHandlePool.length)];
+
+    const picked = `${base}/products/${pickedHandle}`;
+    console.log(
+      `[random-product][${opts.requestId}] picked via products.json (${categoryPool.length > 0 ? "category" : "any"}): ${picked}`
+    );
+    return picked;
+  }
+
+  return null;
+}
+
+async function tryShopifyCollectionsAll(opts: {
+  allowedHost: string;
+  requestId: string;
+}): Promise<string | null> {
+  const baseCandidates = [
+    `https://${opts.allowedHost}`,
+    `https://www.${opts.allowedHost}`,
+  ];
+
+  for (const base of baseCandidates) {
+    const url = `${base}/collections/all?sort_by=best-selling`;
+    try {
+      const html = await fetchText(url, 10000);
+      const handles = extractShopifyHandlesFromHtml(html);
+      console.log(
+        `[random-product][${opts.requestId}] collections/all handles: ${handles.length} (${url})`
+      );
+      if (handles.length === 0) continue;
+      const pickedHandle = handles[Math.floor(Math.random() * handles.length)];
+      const picked = `${base}/products/${pickedHandle}`;
+      console.log(
+        `[random-product][${opts.requestId}] picked via collections/all: ${picked}`
+      );
+      return picked;
+    } catch (err) {
+      console.log(
+        `[random-product][${opts.requestId}] collections/all fetch failed: ${url}`,
+        err
+      );
+    }
+  }
+
+  return null;
+}
+
 async function discoverSitemapStartUrls(allowedHost: string, requestId: string): Promise<string[]> {
   const baseCandidates = [`https://${allowedHost}`, `https://www.${allowedHost}`];
   const sitemapPaths = ["/sitemap.xml", "/sitemap_index.xml", "/sitemapindex.xml"];
@@ -156,6 +313,21 @@ async function discoverRandomProductUrl(opts: {
   requestId: string;
 }): Promise<string> {
   const allowedHost = opts.allowedHosts[0];
+
+  // Best-effort Shopify shortcut (works on many stores and avoids sitemap gaps).
+  const shopifyPicked =
+    (await tryShopifyProductsJson({
+      allowedHost,
+      categories: opts.categories,
+      requestId: opts.requestId,
+    })) ??
+    (await tryShopifyCollectionsAll({
+      allowedHost,
+      requestId: opts.requestId,
+    }));
+
+  if (shopifyPicked) return shopifyPicked;
+
   const sitemapStartUrls = await discoverSitemapStartUrls(allowedHost, opts.requestId);
   console.log(
     `[random-product][${opts.requestId}] sitemap start URLs: ${sitemapStartUrls.length}`
@@ -185,11 +357,36 @@ async function discoverRandomProductUrl(opts: {
       `[random-product][${opts.requestId}] sitemap locs: ${locs.length} (${sitemapUrl})`
     );
 
-    for (const loc of locs) {
+    // Prioritize product sitemaps when present (helps Shopify).
+    const xmlSitemaps = locs.filter((l) => l.toLowerCase().endsWith(".xml"));
+    const urlLocs = locs.filter((l) => !l.toLowerCase().endsWith(".xml"));
+
+    const scoredXml = xmlSitemaps
+      .map((u) => {
+        const lower = u.toLowerCase();
+        const score = lower.includes("product")
+          ? 100
+          : lower.includes("products")
+          ? 90
+          : lower.includes("collection")
+          ? 10
+          : lower.includes("page")
+          ? 5
+          : lower.includes("blog")
+          ? 1
+          : 0;
+        return { u, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.u);
+
+    for (const loc of scoredXml) {
       if (loc.toLowerCase().endsWith(".xml")) {
         if (!seenSitemaps.has(loc) && toVisit.length < 20) toVisit.push(loc);
-        continue;
       }
+    }
+
+    for (const loc of urlLocs) {
       discoveredUrls.push(loc);
       if (discoveredUrls.length >= 6000) break;
     }
@@ -211,6 +408,13 @@ async function discoverRandomProductUrl(opts: {
   );
 
   if (candidates.length === 0) {
+    // One last Shopify-specific fallback before giving up.
+    const fallback = await tryShopifyCollectionsAll({
+      allowedHost,
+      requestId: opts.requestId,
+    });
+    if (fallback) return fallback;
+
     throw new Error(
       "Couldn't find a random product automatically for this website. Please paste a product URL instead."
     );
@@ -249,6 +453,53 @@ serve(async (req) => {
     console.log(
       `[random-product][${requestId}] start company=${companySlug} allowedHosts=${config.allowedHosts.join(",")}`
     );
+
+    // Prefer curated samples from DB (more reliable than sitemaps).
+    try {
+      const supabase = getServiceClient();
+      const { data, error } = await supabase
+        .from("company_prompt_profiles")
+        .select("sample_product_urls")
+        .eq("company_slug", companySlug)
+        .maybeSingle();
+
+      if (error) {
+        console.log(
+          `[random-product][${requestId}] sample_product_urls query failed (will fallback):`,
+          error
+        );
+      } else {
+        const sampleUrls =
+          (data as { sample_product_urls?: unknown } | null)?.sample_product_urls;
+        if (Array.isArray(sampleUrls) && sampleUrls.length > 0) {
+          const { preferred, all } = filterSampleUrls({
+            sampleUrls: sampleUrls as string[],
+            allowedHosts: config.allowedHosts,
+            categories,
+          });
+
+          console.log(
+            `[random-product][${requestId}] db samples: total=${sampleUrls.length}, host_ok=${all.length}, preferred=${preferred.length}`
+          );
+
+          const pool = preferred.length > 0 ? preferred : all;
+          if (pool.length > 0) {
+            const picked = pool[Math.floor(Math.random() * pool.length)];
+            console.log(
+              `[random-product][${requestId}] picked via db samples (${preferred.length > 0 ? "preferred" : "any"}): ${picked}`
+            );
+            return jsonResponse({ url: picked }, 200);
+          }
+        } else {
+          console.log(`[random-product][${requestId}] db samples: none configured`);
+        }
+      }
+    } catch (err) {
+      console.log(
+        `[random-product][${requestId}] db samples lookup crashed (will fallback):`,
+        err
+      );
+    }
 
     const url = await discoverRandomProductUrl({
       allowedHosts: config.allowedHosts,

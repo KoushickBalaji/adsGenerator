@@ -72,6 +72,8 @@ One row per company. Used for:
   - `has_ecommerce`
   - `website_notes`
   - `scrape_profile` (JSONB, includes discovered product URL + adapter hint)
+- Demo UX helpers:
+  - `sample_product_urls` (optional curated list used by “Try a random item”)
 - Prompt overrides:
   - `prompt_style`, `requires_ambassador`, `creative_brief`, `variables`
 - Kling element overrides:

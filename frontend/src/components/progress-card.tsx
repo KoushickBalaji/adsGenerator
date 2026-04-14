@@ -341,7 +341,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-4">
       <h3 className="text-sm font-medium text-zinc-600 mb-3">
-        Reference Images{" "}
+        Product Images{" "}
         <span className="text-xs text-zinc-400 font-normal">
           ({images.length}
           {allImages.length > images.length ? ` of ${allImages.length}` : ""})
