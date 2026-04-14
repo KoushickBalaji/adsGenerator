@@ -9,19 +9,20 @@ const SAMPLE_VIDEO_POSTER = "";
 export default function Home() {
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-14">
+      <div className="grid items-stretch gap-8 lg:grid-cols-2">
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <header className="rounded-2xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-10 shadow-sm">
+      <header className="h-full rounded-2xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-10 shadow-sm">
         <p className="text-xs font-medium tracking-[0.2em] text-blue-600">
-          AI VIDEO ADS FOR JEWELLERY BRANDS
+          AI VIDEOS FOR JEWELRY BRANDS
         </p>
         <h1 className="mt-3 text-3xl font-semibold text-zinc-900 sm:text-4xl lg:text-5xl">
           Turn your product catalog into
-          <br className="hidden sm:block" /> scroll-stopping video ads.
+          <br className="hidden sm:block" /> scroll-stopping videos.
         </h1>
         <p className="mt-5 max-w-3xl text-base leading-relaxed text-zinc-500">
-          Video production is expensive, slow, and impossible to scale across hundreds of SKUs.
-          We fix that. Paste a product link, and our AI extracts the images, writes the script,
-          and generates a cinematic ad — ready for social, marketplaces, or your website.
+          Video production is expensive, slow, and hard to scale across hundreds of SKUs.
+          We fix that. Paste a product link, and our AI extracts the images, writes a short scene plan,
+          and generates a cinematic video — ready for social, marketplaces, or your website.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -31,13 +32,12 @@ export default function Home() {
           >
             Contact us
           </a>
-          <span className="text-xs text-zinc-400">balajikoushick@gmail.com</span>
         </div>
       </header>
 
       {/* ── Video Showcase ───────────────────────────────────────── */}
-      <section className="mt-10">
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
+      <section className="mt-0 flex h-full flex-col">
+        <div className="flex-1 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
           {SAMPLE_VIDEO_URL ? (
             <video
               src={SAMPLE_VIDEO_URL}
@@ -71,6 +71,7 @@ export default function Home() {
           Generated from a product page. No shoot. No editing. No crew.
         </p>
       </section>
+      </div>
 
       {/* ── How It Works ─────────────────────────────────────────── */}
       <section className="mt-14">
@@ -85,21 +86,57 @@ export default function Home() {
           />
           <Step
             number="2"
-            title="AI generates the ad"
-            body="Images are extracted, a script is written, and a cinematic video is produced automatically."
+            title="AI generates the video"
+            body="Images are extracted, a short scene plan is written, and a cinematic video is produced automatically."
           />
           <Step
             number="3"
             title="Download and launch"
-            body="Get an ad-ready video for Instagram Reels, Meta, Amazon, or your own website."
+            body="Get a ready-to-use short video for Instagram Reels, marketplaces, or your website."
           />
         </div>
       </section>
 
       {/* ── Benefits ─────────────────────────────────────────────── */}
+      <section className="mt-14 rounded-2xl border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 p-8 shadow-sm">
+        <h2 className="text-center text-lg font-semibold text-zinc-900">
+          What you can generate
+        </h2>
+        <p className="mx-auto mt-2 max-w-3xl text-center text-sm leading-relaxed text-zinc-500">
+          Use the same product page to generate multiple video formats — from clean product detail
+          shots to lifestyle storytelling.
+        </p>
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Format
+            title="Angle-driven product video"
+            body="Close-ups and rotations designed to highlight finish and sparkle."
+          />
+          <Format
+            title="Collection teaser"
+            body="Short clips to announce new drops across multiple SKUs."
+          />
+          <Format
+            title="Website PDP video"
+            body="Help customers understand size, texture, and details faster."
+          />
+          <Format
+            title="Marketplace listing video"
+            body="Richer visuals for high-intent shoppers comparing options."
+          />
+          <Format
+            title="Campaign variants"
+            body="Multiple hooks and story beats to keep content fresh."
+          />
+          <Format
+            title="Localized versions"
+            body="Adapt pacing and messaging for regions and audiences."
+          />
+        </div>
+      </section>
+
       <section className="mt-14">
         <h2 className="text-center text-lg font-semibold text-zinc-900">
-          Why jewellery brands need this
+          Why jewelry teams adopt this
         </h2>
         <div className="mt-8 grid gap-5 sm:grid-cols-2">
           <Benefit
@@ -108,15 +145,15 @@ export default function Home() {
           />
           <Benefit
             title="No studio, no crew, no delays"
-            body="Skip the 2-week production cycle. Go from product page to ad-ready video in minutes, not months."
+            body="Skip the 2-week production cycle. Go from product page to a polished video in minutes, not months."
           />
           <Benefit
-            title="Built for how jewellery sells"
-            body="Lighting, motion, and close-ups optimized for jewellery — the sparkle, the detail, the craftsmanship that converts browsers into buyers."
+            title="Built for how jewelry sells"
+            body="Lighting, motion, and close-ups optimized for jewelry — the sparkle, the detail, the craftsmanship that converts browsers into buyers."
           />
           <Benefit
             title="Fresh creatives on demand"
-            body="New collection? Festival season? Generate fresh ads overnight without rebooking a shoot or waiting on an agency."
+            body="New collection? Festival season? Generate fresh videos overnight without rebooking a shoot or waiting on an agency."
           />
         </div>
       </section>
@@ -124,20 +161,48 @@ export default function Home() {
       {/* ── Use Cases ────────────────────────────────────────────── */}
       <section className="mt-14">
         <h2 className="text-center text-lg font-semibold text-zinc-900">
-          Where it fits
+          Use cases for AI video generation
         </h2>
-        <div className="mt-8 grid gap-5 sm:grid-cols-3">
+        <p className="mx-auto mt-2 max-w-3xl text-center text-sm leading-relaxed text-zinc-500">
+          Start with product videos, then expand into launches, listings, and campaigns. The same
+          catalog can fuel multiple formats without adding production overhead.
+        </p>
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <UseCase
-            title="Social ads"
-            body="Instagram Reels, Meta, YouTube Shorts — generate scroll-stopping creatives at the pace your campaigns demand."
+            title="Product detail videos"
+            body="Show sparkle, craftsmanship, and scale with controlled motion and close-ups."
           />
           <UseCase
-            title="Marketplace listings"
-            body="Richer product pages on Amazon, Flipkart, or your own store. Video listings get more engagement, period."
+            title="Social videos"
+            body="Create short videos for Reels/Shorts that look native in-feed while staying on-brand."
           />
           <UseCase
-            title="Collection launches"
-            body="Turn a new drop into a full video campaign overnight. No lead time, no coordination, just results."
+            title="Marketplace enhancements"
+            body="Add richer visuals to listings where customers decide quickly between similar pieces."
+          />
+          <UseCase
+            title="New collection teasers"
+            body="Generate launch clips across many SKUs without waiting for production windows."
+          />
+          <UseCase
+            title="Festival & seasonal drops"
+            body="Create timely videos for moments like weddings, gifting, Akshaya Tritiya, and Diwali."
+          />
+          <UseCase
+            title="Website merchandising"
+            body="Use videos on PDPs, category pages, and landing pages to reduce hesitation and returns."
+          />
+          <UseCase
+            title="Retargeting variants"
+            body="Produce multiple angles and story beats so campaigns don’t go stale after a few days."
+          />
+          <UseCase
+            title="Localization"
+            body="Adapt pacing and messaging for different languages, regions, and audiences."
+          />
+          <UseCase
+            title="Catalog experiments"
+            body="Test hooks and styles to learn what drives engagement for your brand."
           />
         </div>
       </section>
@@ -145,7 +210,27 @@ export default function Home() {
       {/* ── Try It CTA ───────────────────────────────────────────── */}
 
       {/* ── Footer ───────────────────────────────────────────────── */}
-      <footer className="mt-10 text-center text-xs text-zinc-400">
+      <section className="mt-14 overflow-hidden rounded-2xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-8 shadow-sm">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 className="text-lg font-semibold text-zinc-900">
+            Want this for your brand?
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+            Share your website link and we’ll set up a dedicated demo page for your store, with
+            the right scraping rules and prompt style.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <a
+              href="mailto:balajikoushick@gmail.com"
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500"
+            >
+              Contact us
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <footer className="mt-12 rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-6 text-center text-xs text-zinc-500">
         This is a technology demonstration. Outputs are AI-generated and may vary.
       </footer>
     </main>
@@ -164,7 +249,7 @@ function Step({
   body: string;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center">
+    <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
       <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">
         {number}
       </div>
@@ -176,18 +261,27 @@ function Step({
 
 function Benefit({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-6">
+    <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-zinc-500">{body}</p>
     </div>
   );
 }
 
+function Format({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <p className="text-sm font-semibold text-zinc-900">{title}</p>
+      <p className="mt-1 text-sm leading-relaxed text-zinc-600">{body}</p>
+    </div>
+  );
+}
+
 function UseCase({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6">
-      <h3 className="text-sm font-semibold text-zinc-800">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-500">{body}</p>
+    <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+      <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-600">{body}</p>
     </div>
   );
 }
