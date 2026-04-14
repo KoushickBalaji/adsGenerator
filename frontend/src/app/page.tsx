@@ -231,10 +231,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <footer className="mt-12 rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-6 text-center text-xs text-zinc-500">
-        This is a technology demonstration. Outputs are AI-generated and may vary.
-      </footer>
     </main>
   );
 }
