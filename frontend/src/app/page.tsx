@@ -1,10 +1,9 @@
-import { Suspense } from "react";
-import { DemoRedirectForm } from "./demo-redirect-form";
 
 /* ── Sample video showcase ──────────────────────────────────────────────
    Set this to a public URL (e.g. Supabase Storage) to show a real
    generated video on the landing page. Leave empty to show a placeholder. */
-const SAMPLE_VIDEO_URL = "";
+const SAMPLE_VIDEO_URL =
+  "https://yjfcfxrytcenwlfdbofp.supabase.co/storage/v1/object/public/generated-videos/d831a8c5-54c5-4579-8bdb-e3686e215037.mp4";
 const SAMPLE_VIDEO_POSTER = "";
 
 export default function Home() {
@@ -24,6 +23,16 @@ export default function Home() {
           We fix that. Paste a product link, and our AI extracts the images, writes the script,
           and generates a cinematic ad — ready for social, marketplaces, or your website.
         </p>
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <a
+            href="mailto:balajikoushick@gmail.com"
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500"
+          >
+            Contact us
+          </a>
+          <span className="text-xs text-zinc-400">balajikoushick@gmail.com</span>
+        </div>
       </header>
 
       {/* ── Video Showcase ───────────────────────────────────────── */}
@@ -134,9 +143,6 @@ export default function Home() {
       </section>
 
       {/* ── Try It CTA ───────────────────────────────────────────── */}
-      <Suspense fallback={null}>
-        <DemoRedirectForm />
-      </Suspense>
 
       {/* ── Footer ───────────────────────────────────────────────── */}
       <footer className="mt-10 text-center text-xs text-zinc-400">
