@@ -8,10 +8,10 @@ const SAMPLE_VIDEO_POSTER = "";
 
 export default function Home() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 py-14">
-      <div className="grid items-stretch gap-8 lg:grid-cols-2">
+    <main className="mx-auto w-full max-w-screen-2xl px-6 py-14">
+      <div className="grid items-start gap-10 lg:grid-cols-12">
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <header className="h-full rounded-2xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-10 shadow-sm">
+      <header className="rounded-2xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-10 shadow-sm lg:col-span-5">
         <p className="text-xs font-medium tracking-[0.2em] text-blue-600">
           AI VIDEOS FOR JEWELRY BRANDS
         </p>
@@ -36,36 +36,38 @@ export default function Home() {
       </header>
 
       {/* ── Video Showcase ───────────────────────────────────────── */}
-      <section className="mt-0 flex h-full flex-col">
-        <div className="flex-1 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
-          {SAMPLE_VIDEO_URL ? (
-            <video
-              src={SAMPLE_VIDEO_URL}
-              poster={SAMPLE_VIDEO_POSTER || undefined}
-              preload="auto"
-              controls
-              controlsList="nodownload noremoteplayback"
-              disablePictureInPicture
-              className="aspect-square w-full object-contain sm:aspect-video"
-            />
-          ) : (
-            <div className="flex aspect-square items-center justify-center bg-zinc-100/60 sm:aspect-video">
-              <div className="text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-zinc-200 bg-white shadow-sm">
-                  <svg
-                    className="h-7 w-7 text-blue-500"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
+      <section className="mt-0 lg:col-span-7">
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-black shadow-sm">
+          <div className="aspect-video w-full">
+            {SAMPLE_VIDEO_URL ? (
+              <video
+                src={SAMPLE_VIDEO_URL}
+                poster={SAMPLE_VIDEO_POSTER || undefined}
+                preload="auto"
+                controls
+                controlsList="nodownload noremoteplayback"
+                disablePictureInPicture
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-zinc-900/50">
+                <div className="text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-zinc-200 bg-white shadow-sm">
+                    <svg
+                      className="h-7 w-7 text-blue-500"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                  <p className="mt-4 text-sm text-zinc-400">
+                    Sample video coming soon
+                  </p>
                 </div>
-                <p className="mt-4 text-sm text-zinc-400">
-                  Sample video coming soon
-                </p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <p className="mt-3 text-center text-xs text-zinc-400">
           Generated from a product page. No shoot. No editing. No crew.
