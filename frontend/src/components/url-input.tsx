@@ -81,7 +81,13 @@ export function UrlInput({
         </div>
       )}
 
-      <div className={`flex items-center justify-center gap-3 ${onTryRandom ? "mt-3" : ""}`}>
+      {onTryRandom && (
+        <p className="mt-3 text-center text-sm font-medium text-zinc-600">
+          Or, try a specific product
+        </p>
+      )}
+
+      <div className={`flex items-center justify-center gap-3 ${onTryRandom ? "mt-2" : ""}`}>
         <input
           type="text"
           value={url}

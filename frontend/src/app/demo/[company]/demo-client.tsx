@@ -36,6 +36,8 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
   const [error, setError] = useState("");
   const [showDisclaimer, setShowDisclaimer] = useState(!autostart);
   const autostartFired = useRef(false);
+  const [prefetchedVideos, setPrefetchedVideos] = useState<Record<string, string>>({});
+  const prefetchedVideosRef = useRef<Record<string, string>>({});
 
   const activeRunId = activeRun?.id ?? null;
   const activeRunStatus = activeRun?.status ?? null;
@@ -55,8 +57,19 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
 
   // Load history on mount and when company changes
   useEffect(() => {
+    // Clean up any previously prefetched blobs when switching companies.
+    Object.values(prefetchedVideosRef.current).forEach((u) => {
+      try {
+        URL.revokeObjectURL(u);
+      } catch {
+        // ignore
+      }
+    });
+
     setRuns([]);
     setActiveRun(null);
+    setPrefetchedVideos({});
+    prefetchedVideosRef.current = {};
     loadHistory();
   }, [loadHistory]);
 
@@ -65,6 +78,66 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
     if (activeRunId || runs.length === 0) return;
     setActiveRun(runs[0]);
   }, [activeRunId, runs]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const candidates = runs
+      .filter((r) => r.status === "completed" && !!r.output_video_url)
+      .slice(0, 10);
+
+    async function prefetchOne(run: VideoRun) {
+      const existing = prefetchedVideosRef.current[run.id];
+      if (existing) return;
+      const url = run.output_video_url;
+      if (!url) return;
+
+      try {
+        // Fetch the full file into the browser cache (and optionally swap to a blob URL).
+        const res = await fetch(url, { cache: "force-cache" });
+        if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        const blobUrl = URL.createObjectURL(blob);
+        prefetchedVideosRef.current = { ...prefetchedVideosRef.current, [run.id]: blobUrl };
+        setPrefetchedVideos((prev) => ({ ...prev, [run.id]: blobUrl }));
+      } catch {
+        // Silent: the <video> tag can still stream directly from the URL.
+      }
+    }
+
+    async function runQueue() {
+      // Small concurrency to avoid spiking bandwidth.
+      const concurrency = 3;
+      let i = 0;
+      const workers = new Array(concurrency).fill(null).map(async () => {
+        while (!cancelled && i < candidates.length) {
+          const next = candidates[i++];
+          await prefetchOne(next);
+        }
+      });
+      await Promise.all(workers);
+    }
+
+    runQueue();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [runs]);
+
+  useEffect(() => {
+    // Final cleanup on unmount.
+    return () => {
+      Object.values(prefetchedVideosRef.current).forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {
+          // ignore
+        }
+      });
+    };
+  }, []);
 
   // Auto-start generation when redirected from the landing page with a URL
   useEffect(() => {
@@ -482,7 +555,11 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
 
           <section className="order-1 lg:order-2 min-h-0 overflow-hidden">
             {activeRun ? (
-              <ProgressCard run={activeRun} onRefresh={handleRefresh} />
+              <ProgressCard
+                run={activeRun}
+                onRefresh={handleRefresh}
+                prefetchedVideoSrc={prefetchedVideos[activeRun.id] || null}
+              />
             ) : (
               <div className="rounded-xl border border-dashed border-zinc-300 p-12 text-center">
                 <p className="text-zinc-500">

@@ -6,6 +6,7 @@ import type { VideoRun } from "@/lib/supabase";
 type Props = {
   run: VideoRun;
   onRefresh: () => void;
+  prefetchedVideoSrc?: string | null;
 };
 
 const STATUS_COLORS: Record<VideoRun["status"], string> = {
@@ -233,6 +234,14 @@ function ProcessingPipeline({ startedAt }: { startedAt: string }) {
 }
 
 export function ProgressCard({ run, onRefresh }: Props) {
+  const [playbackStartedForRunId, setPlaybackStartedForRunId] = useState<string | null>(null);
+  const hasStartedPlayback = playbackStartedForRunId === run.id;
+
+  const effectiveVideoSrc =
+    run.output_video_url && (hasStartedPlayback || !prefetchedVideoSrc)
+      ? run.output_video_url
+      : prefetchedVideoSrc || run.output_video_url;
+
   return (
     <div className="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-6">
       <div className="flex items-center justify-between mb-4">
@@ -293,16 +302,17 @@ export function ProgressCard({ run, onRefresh }: Props) {
       )}
 
       {/* Completed state */}
-      {run.status === "completed" && run.output_video_url && (
+      {run.status === "completed" && effectiveVideoSrc && (
         <div className="min-h-0 flex-1 relative">
           <video
-            src={run.output_video_url}
+            src={effectiveVideoSrc}
             preload="auto"
             controls
             controlsList="nodownload noremoteplayback"
             disablePictureInPicture
             className="h-full w-full rounded-lg object-contain"
             poster={run.thumbnail_url || undefined}
+            onPlay={() => setPlaybackStartedForRunId(run.id)}
           />
           <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-black/10 bg-white/80 px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-600 backdrop-blur-sm">
             Not for commercial use
