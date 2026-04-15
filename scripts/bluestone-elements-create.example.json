@@ -1,5 +1,7 @@
 {
   "assets_base_url": "https://<your-vercel-deployment-or-domain>",
+  "prefix": "bluestone",
+  "enforce_prefix": true,
   "dry_run": true,
   "on_existing": "skip",
   "elements": [
@@ -45,4 +47,3 @@
     }
   ]
 }
-

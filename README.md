@@ -205,8 +205,9 @@ Admin utility endpoints (via `supabase/functions/test-prompt`):
 - List elements:
   - `GET /functions/v1/test-prompt?mode=elements&kind=custom|preset|all&all=true&pageSize=100&maxPages=20&prefix=<prefix>`
 - Create elements in bulk:
-  - `POST /functions/v1/test-prompt?mode=elements-create`
+  - `POST /functions/v1/test-prompt?mode=elements-create&prefix=<prefix>` (or set `"prefix"` in the JSON body)
   - Header: `x-admin-secret: <WEBHOOK_SECRET>`
+  - Names are validated to start with the chosen prefix (set `"enforce_prefix": false` to disable).
 - Delete elements in bulk:
   - `POST /functions/v1/test-prompt?mode=elements-delete`
   - Header: `x-admin-secret: <WEBHOOK_SECRET>`

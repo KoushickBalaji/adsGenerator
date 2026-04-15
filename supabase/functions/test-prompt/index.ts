@@ -137,6 +137,8 @@ serve(async (req) => {
     // Headers: x-admin-secret: <WEBHOOK_SECRET>
     // Body:
     // {
+    //   "prefix": "bluestone", // optional; defaults to query ?prefix=... or "bluestone"
+    //   "enforce_prefix": true, // optional; set false to allow any names
     //   "assets_base_url": "https://<your-vercel-deployment>",
     //   "elements": [
     //     {
@@ -160,6 +162,16 @@ serve(async (req) => {
       }
 
       const body = (await req.json()) as Record<string, unknown>;
+      const createPrefixRaw =
+        (typeof body.prefix === "string" ? body.prefix.trim() : "") ||
+        (typeof body.eligible_prefix === "string" ? body.eligible_prefix.trim() : "") ||
+        (reqUrl.searchParams.get("prefix") ?? "").trim() ||
+        "bluestone";
+      const enforcePrefix =
+        (body.enforce_prefix as boolean | undefined) ??
+        (body.enforcePrefix as boolean | undefined) ??
+        true;
+
       const assetsBaseUrlRaw =
         (body.assets_base_url as string | undefined) ??
         (body.assetsBaseUrl as string | undefined);
@@ -267,11 +279,14 @@ serve(async (req) => {
           validationErrors.push({ index: i, error: "Missing element name" });
           continue;
         }
-        if (!isElementNameEligible(name, eligiblePrefix)) {
+        if (enforcePrefix && !isElementNameEligible(name, createPrefixRaw)) {
           validationErrors.push({
             index: i,
             name,
-            error: `Element name must start with "${eligiblePrefix}"`,
+            error:
+              `Element name must start with "${createPrefixRaw}". ` +
+              `Set request body { "prefix": "${createPrefixRaw}" } or add ?prefix=... to the URL ` +
+              `or set { "enforce_prefix": false } to disable this check.`,
           });
           continue;
         }
@@ -349,7 +364,7 @@ serve(async (req) => {
         return json(
           {
             error: "Validation failed",
-            eligible_prefix: eligiblePrefix,
+            eligible_prefix: createPrefixRaw,
             assets_base_url: assetsBaseUrl.toString(),
             details: validationErrors,
           },
@@ -396,7 +411,7 @@ serve(async (req) => {
       return json(
         {
           mode: "elements-create",
-          eligible_prefix: eligiblePrefix,
+          eligible_prefix: createPrefixRaw,
           assets_base_url: assetsBaseUrl.toString(),
           dry_run: dryRun,
           results,
