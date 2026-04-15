@@ -460,6 +460,44 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     },
   },
 
+  thangamayil: {
+    slug: "thangamayil",
+    displayName: "Thangamayil Jewellery",
+    allowedHosts: ["thangamayil.com"],
+    scraper: {
+      // Thangamayil's store pages are HTML-first (Magento-style); use the generic HTML scraper.
+      adapter: "generic",
+      maxReferenceImages: 12,
+    },
+    kling: {
+      modelCandidates: ["kling-v3-omni", "kling-v3"],
+      defaults: {
+        duration: "10",
+        aspectRatio: "1:1",
+        mode: "pro",
+      },
+      ambassador: {
+        enabled: true,
+        // Prefer brand-specific custom elements if present; fall back to shared generic personas.
+        elementPrefixCandidates: [
+          "thangamayil",
+          "generic-female-v1",
+          "generic-male-v1",
+          "generic-unisex-v1",
+        ],
+      },
+    },
+    prompt: {
+      requiresAmbassador: true,
+      style: "jewellery_generic_v1",
+    },
+    limits: {
+      maxConcurrentRuns: 3,
+      maxLifetimeSuccessfulVideos: 10,
+      maxAttemptsPerDay: 30,
+    },
+  },
+
   // Optional baselines / examples:
   "generic-model": {
     slug: "generic-model",

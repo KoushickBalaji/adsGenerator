@@ -18,6 +18,7 @@ const HOST_TO_COMPANY: Record<string, string> = {
   "shravia.com": "shravia",
   "houseofmila.co": "houseofmila",
   "ishhaara.com": "ishhaara",
+  "thangamayil.com": "thangamayil",
 };
 
 /**

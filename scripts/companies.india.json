@@ -18,6 +18,12 @@
     "notes": "Bengaluru-based online jewellery brand."
   },
   {
+    "slug": "thangamayil",
+    "name": "Thangamayil Jewellery",
+    "website": "https://www.thangamayil.com",
+    "notes": "Tamil Nadu jewellery chain (Madurai HQ) with ecommerce storefront."
+  },
+  {
     "slug": "kushals",
     "name": "Kushal's Fashion Jewellery",
     "website": "https://www.kushals.com",
