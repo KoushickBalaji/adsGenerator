@@ -375,6 +375,7 @@ export function ReferencePanel({ run }: { run: VideoRun }) {
                 <img
                   src={url}
                   alt={label}
+                  referrerPolicy="no-referrer"
                   className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                   loading="lazy"
                 />
