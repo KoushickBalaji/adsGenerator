@@ -12,6 +12,17 @@ type Props = {
   autostart?: boolean;
 };
 
+type OccasionPreset = NonNullable<VideoRun["occasion"]>;
+
+const OCCASION_OPTIONS: Array<{ value: OccasionPreset; label: string }> = [
+  { value: "auto", label: "Auto" },
+  { value: "casual", label: "Casual" },
+  { value: "partywear", label: "Partywear" },
+  { value: "marriage", label: "Marriage / Wedding" },
+  { value: "workwear", label: "Workwear" },
+  { value: "festive", label: "Festive" },
+];
+
 function normalizeCompanySlug(input: string): string {
   return (input || "").trim().toLowerCase();
 }
@@ -38,6 +49,8 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
   const autostartFired = useRef(false);
   const [prefetchedVideos, setPrefetchedVideos] = useState<Record<string, string>>({});
   const prefetchedVideosRef = useRef<Record<string, string>>({});
+  const [occasion, setOccasion] = useState<OccasionPreset>("auto");
+  const [generatePreviews, setGeneratePreviews] = useState(true);
 
   const activeRunId = activeRun?.id ?? null;
   const activeRunStatus = activeRun?.status ?? null;
@@ -250,6 +263,7 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
       source_url: url,
       product_title: null,
       product_category: null,
+      occasion,
       status: "processing",
       provider: "kling",
       provider_job_id: null,
@@ -257,6 +271,8 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
       prompt: null,
       output_video_url: null,
       thumbnail_url: null,
+      preview_images: [],
+      preview_error: null,
       error_message: null,
       created_at: nowIso,
       updated_at: nowIso,
@@ -271,6 +287,7 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
           url,
           runId: optimisticRunId,
           companySlug: normalizedCompanySlug,
+          occasion,
         },
       });
 
@@ -285,6 +302,16 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
 
       const { runId } = res.data as { runId?: string };
       const effectiveRunId = runId || optimisticRunId;
+
+      if (generatePreviews) {
+        supabase.functions
+          .invoke("generate-previews", {
+            body: { runId: effectiveRunId, companySlug: normalizedCompanySlug },
+          })
+          .catch(() => {
+            // Non-blocking: previews are best-effort.
+          });
+      }
 
       const { data: run } = await supabase
         .from("video_runs")
@@ -492,6 +519,35 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
             <div>
               <h1 className="text-lg font-semibold text-zinc-900">Video Demo</h1>
             </div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-zinc-600">
+              <span className="font-medium text-zinc-700">Occasion</span>
+              <select
+                value={occasion}
+                onChange={(e) => setOccasion(e.target.value as OccasionPreset)}
+                disabled={starting}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {OCCASION_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex items-center gap-2 text-sm text-zinc-600">
+              <input
+                type="checkbox"
+                checked={generatePreviews}
+                onChange={(e) => setGeneratePreviews(e.target.checked)}
+                disabled={starting}
+                className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+              />
+              <span className="font-medium text-zinc-700">Generate shot previews</span>
+            </label>
           </div>
 
           <UrlInput

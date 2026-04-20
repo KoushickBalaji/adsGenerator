@@ -23,6 +23,29 @@ const CORS_HEADERS = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+type OccasionPreset =
+  | "auto"
+  | "casual"
+  | "partywear"
+  | "marriage"
+  | "workwear"
+  | "festive";
+
+function normalizeOccasionPreset(value: unknown): OccasionPreset {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  switch (v) {
+    case "casual":
+    case "partywear":
+    case "marriage":
+    case "workwear":
+    case "festive":
+      return v;
+    case "auto":
+    default:
+      return "auto";
+  }
+}
+
 // Demo-wide concurrency cap (shared demo environment + Kling upstream limits).
 const GLOBAL_MAX_CONCURRENT_RUNS = 5;
 
@@ -65,6 +88,8 @@ serve(async (req) => {
   const supabase = getServiceClient();
   let insertedRunId: string | null = null;
   let createdProviderJobId: string | null = null;
+  let pickedAmbassadorElementId: string | null = null;
+  let pickedAmbassadorElementName: string | null = null;
 
   try {
     let body: Record<string, unknown>;
@@ -81,6 +106,7 @@ serve(async (req) => {
     const url = body.url;
     const runId = body.runId;
     const companySlug = typeof body.companySlug === "string" ? body.companySlug : "bluestone";
+    const occasion = normalizeOccasionPreset(body.occasion);
 
     const config = getCompanyConfig(companySlug);
     if (!config) {
@@ -204,6 +230,7 @@ serve(async (req) => {
       source_url: url,
       status: "processing",
       company_slug: config.slug,
+      occasion,
     };
     if (typeof runId === "string" && isUuid(runId)) {
       insertPayload.id = runId;
@@ -280,6 +307,9 @@ serve(async (req) => {
       }
     }
 
+    pickedAmbassadorElementId = element?.id ?? null;
+    pickedAmbassadorElementName = element?.name ?? null;
+
     // Step 5: Generate prompt (always includes <<<element_1>>> + <<<image_1>>>...)
     const { prompt, request } = await generateKlingPromptWithGemini(
       product,
@@ -288,6 +318,7 @@ serve(async (req) => {
       {
         creativeBrief,
         variables: promptVariables,
+        occasion,
       }
     );
     console.log(`[step 5] Prompt: ${prompt}`);
@@ -306,6 +337,8 @@ serve(async (req) => {
         // Persist the references used for this run (keep the UI simple).
         // Kling receives the first 4 reference images.
         input_images: (request.productImageUrls || []).slice(0, 4),
+        ambassador_element_id: pickedAmbassadorElementId,
+        ambassador_element_name: pickedAmbassadorElementName,
         prompt,
       })
       .eq("id", run.id);

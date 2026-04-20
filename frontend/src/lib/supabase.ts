@@ -11,6 +11,7 @@ export type VideoRun = {
   source_url: string;
   product_title: string | null;
   product_category: string | null;
+  occasion?: "auto" | "casual" | "partywear" | "marriage" | "workwear" | "festive";
   status: "queued" | "processing" | "completed" | "failed";
   provider: string;
   provider_job_id: string | null;
@@ -18,6 +19,8 @@ export type VideoRun = {
   prompt: string | null;
   output_video_url: string | null;
   thumbnail_url: string | null;
+  preview_images?: string[];
+  preview_error?: string | null;
   error_message: string | null;
   created_at: string;
   updated_at: string;

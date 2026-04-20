@@ -288,6 +288,8 @@ export function ProgressCard({ run, onRefresh, prefetchedVideoSrc }: Props) {
         </div>
       </div>
 
+      <ShotPreviews run={run} />
+
       {/* Queued state */}
       {run.status === "queued" && (
         <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-yellow-50 border border-yellow-200">
@@ -338,6 +340,84 @@ export function ProgressCard({ run, onRefresh, prefetchedVideoSrc }: Props) {
         </div>
       )}
 
+    </div>
+  );
+}
+
+function ShotPreviews({ run }: { run: VideoRun }) {
+  const images = Array.isArray(run.preview_images) ? run.preview_images : [];
+  const shot1 = images[0] ? String(images[0]) : "";
+  const shot2 = images[1] ? String(images[1]) : "";
+  const previewError = run.preview_error ? String(run.preview_error) : "";
+
+  if (!shot1 && !shot2 && !previewError) return null;
+
+  return (
+    <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-zinc-600 tracking-wide">
+          Shot Previews
+        </h3>
+        {previewError && (
+          <span className="text-[11px] text-zinc-500">Previews unavailable</span>
+        )}
+      </div>
+
+      {previewError && <p className="mt-2 text-xs text-zinc-500">{previewError}</p>}
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {shot1 ? (
+          <a
+            href={shot1}
+            target="_blank"
+            rel="noreferrer"
+            className="group block"
+            title="Shot 1 preview"
+          >
+            <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
+              <img
+                src={shot1}
+                alt="Shot 1 preview"
+                className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                loading="lazy"
+              />
+            </div>
+            <p className="mt-1 text-center text-[11px] text-zinc-500 group-hover:text-zinc-700 transition-colors">
+              Shot 1
+            </p>
+          </a>
+        ) : (
+          <div className="rounded-md border border-dashed border-zinc-200 bg-white p-6 text-center">
+            <p className="text-[11px] text-zinc-400">Shot 1</p>
+          </div>
+        )}
+
+        {shot2 ? (
+          <a
+            href={shot2}
+            target="_blank"
+            rel="noreferrer"
+            className="group block"
+            title="Shot 2 preview"
+          >
+            <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
+              <img
+                src={shot2}
+                alt="Shot 2 preview"
+                className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                loading="lazy"
+              />
+            </div>
+            <p className="mt-1 text-center text-[11px] text-zinc-500 group-hover:text-zinc-700 transition-colors">
+              Shot 2
+            </p>
+          </a>
+        ) : (
+          <div className="rounded-md border border-dashed border-zinc-200 bg-white p-6 text-center">
+            <p className="text-[11px] text-zinc-400">Shot 2</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

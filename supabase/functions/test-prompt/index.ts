@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { scrapeProduct } from "../_shared/scraper.ts";
-import { generateKlingPromptWithGemini } from "../_shared/geminiPrompt.ts";
+import {
+  generateKlingPromptWithGemini,
+  type OccasionPreset,
+} from "../_shared/geminiPrompt.ts";
+import { getServiceClient } from "../_shared/supabase.ts";
 import {
   createCustomElement,
   deleteCustomElement,
@@ -14,6 +18,21 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-admin-secret",
 };
+
+function normalizeOccasionPreset(value: unknown): string {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  switch (v) {
+    case "casual":
+    case "partywear":
+    case "marriage":
+    case "workwear":
+    case "festive":
+    case "auto":
+      return v;
+    default:
+      return "";
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -373,6 +392,36 @@ serve(async (req) => {
       }
 
       const results: Array<Record<string, unknown>> = [];
+      const supabase = (() => {
+        try {
+          return getServiceClient();
+        } catch {
+          return null;
+        }
+      })();
+
+      async function upsertElementAssetMapping(opts: {
+        elementId: string;
+        elementName: string;
+        frontalUrl: string;
+        refUrls: string[];
+      }) {
+        if (!supabase) return;
+        if (!opts.elementId || !opts.frontalUrl) return;
+        try {
+          await supabase
+            .from("kling_element_assets")
+            .upsert({
+              element_id: opts.elementId,
+              element_name: opts.elementName,
+              frontal_url: opts.frontalUrl,
+              ref_urls: opts.refUrls,
+            });
+        } catch (err) {
+          console.warn("[elements-create] Failed to upsert kling_element_assets:", err);
+        }
+      }
+
       for (const el of normalized) {
         const existingMatch = existing.map.get(el.name.trim().toLowerCase());
         if (existingMatch) {
@@ -384,6 +433,14 @@ serve(async (req) => {
             });
             continue;
           }
+
+          await upsertElementAssetMapping({
+            elementId: existingMatch.id,
+            elementName: existingMatch.name,
+            frontalUrl: el.frontal_url,
+            refUrls: el.ref_urls,
+          });
+
           results.push({
             name: el.name,
             status: "skipped_existing",
@@ -405,7 +462,34 @@ serve(async (req) => {
         }
 
         const res = await createCustomElement(reqBody);
-        results.push({ name: el.name, status: "created", response: res });
+
+        // Best-effort: find the created element ID by name and persist the frontal URL mapping.
+        let createdId: string | null = null;
+        try {
+          const allCustom = await listCustomElements(1, 100);
+          const match = allCustom.find(
+            (e) => e.name.trim().toLowerCase() === el.name.trim().toLowerCase()
+          );
+          if (match?.id) createdId = match.id;
+        } catch (err) {
+          console.warn("[elements-create] Could not re-list elements to find created ID:", err);
+        }
+
+        if (createdId) {
+          await upsertElementAssetMapping({
+            elementId: createdId,
+            elementName: el.name,
+            frontalUrl: el.frontal_url,
+            refUrls: el.ref_urls,
+          });
+        }
+
+        results.push({
+          name: el.name,
+          status: "created",
+          created_id: createdId,
+          response: res,
+        });
       }
 
       return json(
@@ -577,6 +661,7 @@ serve(async (req) => {
     }
 
     const url = body.url;
+    const occasion = normalizeOccasionPreset(body.occasion);
 
     // Validate URL (match create-run behavior)
     if (!url || typeof url !== "string") {
@@ -603,7 +688,9 @@ serve(async (req) => {
     // Generate Gemini prompt using the exact same logic as create-run
     const { prompt, request, usageMetadata } = await generateKlingPromptWithGemini(
       product,
-      product.input_images.length
+      product.input_images.length,
+      undefined,
+      occasion ? { occasion: occasion as OccasionPreset } : undefined
     );
 
     const expectedImageTokens = request.imageRefs;

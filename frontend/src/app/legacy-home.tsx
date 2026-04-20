@@ -126,6 +126,7 @@ export default function Home() {
       source_url: url,
       product_title: null,
       product_category: null,
+      occasion: "auto",
       status: "processing",
       provider: "kling",
       provider_job_id: null,
@@ -133,6 +134,8 @@ export default function Home() {
       prompt: null,
       output_video_url: null,
       thumbnail_url: null,
+      preview_images: [],
+      preview_error: null,
       error_message: null,
       created_at: nowIso,
       updated_at: nowIso,
@@ -143,7 +146,7 @@ export default function Home() {
 
     try {
       const res = await supabase.functions.invoke("create-run", {
-        body: { url, runId: optimisticRunId },
+        body: { url, runId: optimisticRunId, occasion: "auto" },
       });
 
       if (res.error) {

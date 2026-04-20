@@ -8,9 +8,18 @@ export type PromptPolicy = {
   style: PromptStyle;
 };
 
+export type OccasionPreset =
+  | "auto"
+  | "casual"
+  | "partywear"
+  | "marriage"
+  | "workwear"
+  | "festive";
+
 export type PromptOverrides = {
   creativeBrief?: string | null;
   variables?: Record<string, unknown>;
+  occasion?: OccasionPreset;
 };
 
 export const DEFAULT_PROMPT_POLICY: PromptPolicy = {
@@ -507,6 +516,10 @@ function formatPromptOverrides(overrides?: PromptOverrides): string | null {
 
   const chunks: string[] = [];
 
+  if (typeof overrides.occasion === "string" && overrides.occasion.trim()) {
+    chunks.push(`Occasion preset:\n${overrides.occasion.trim()}`);
+  }
+
   if (typeof overrides.creativeBrief === "string" && overrides.creativeBrief.trim()) {
     chunks.push(`Brand creative brief:\n${overrides.creativeBrief.trim()}`);
   }
@@ -556,6 +569,82 @@ function formatPromptOverrides(overrides?: PromptOverrides): string | null {
   return chunks.join("\n\n");
 }
 
+function normalizeOccasionPreset(value: unknown): OccasionPreset {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  switch (v) {
+    case "casual":
+    case "partywear":
+    case "marriage":
+    case "workwear":
+    case "festive":
+      return v;
+    case "auto":
+    default:
+      return "auto";
+  }
+}
+
+function getOccasionCreativeGuidance(
+  occasion: OccasionPreset
+): { settingPreference: string; wardrobePreference: string; storyPreference: string; moodPreference: string } | null {
+  if (!occasion || occasion === "auto") return null;
+
+  switch (occasion) {
+    case "casual":
+      return {
+        settingPreference:
+          "bright home, cafe, boutique, outdoor walkway, relaxed dinner setting (keep it grounded and not over-the-top)",
+        wardrobePreference:
+          "premium casual/smart outfit (non-branded). Keep it tasteful and not revealing.",
+        storyPreference:
+          "a relatable everyday moment: errands, a coffee stop, or getting ready to step out",
+        moodPreference: "effortless, warm, premium, natural",
+      };
+    case "partywear":
+      return {
+        settingPreference:
+          "mirror-ready moment before going out, upscale lounge, rooftop bar arrival, evening city lobby (avoid club-like chaos; keep it premium and grounded)",
+        wardrobePreference:
+          "premium partywear/evening outfit (non-branded). Keep it tasteful and not revealing.",
+        storyPreference:
+          "a confident evening moment: getting ready, arriving, or a quiet toast with friends",
+        moodPreference: "glamorous, warm, confident, premium",
+      };
+    case "marriage":
+      return {
+        settingPreference:
+          "getting-ready space with warm daylight, wedding venue hallway, reception entrance, family gathering corner (guest vibe; not bridal; keep it premium and grounded)",
+        wardrobePreference:
+          "festive traditional/ethnic outfit (saree/lehenga/sherwani style, non-branded). Keep it tasteful and not revealing.",
+        storyPreference:
+          "a wedding guest moment: final checks before stepping out, greeting family, arriving at the venue",
+        moodPreference: "warm, celebratory, elegant, premium",
+      };
+    case "workwear":
+      return {
+        settingPreference:
+          "modern office, boardroom, elevator, office lobby, commute, home office before a presentation",
+        wardrobePreference:
+          "business professional workwear (corporate/boardroom). Keep it tasteful and not revealing.",
+        storyPreference:
+          "a high-stakes-but-real work moment: prepping or leading a presentation, important meeting, commute to a big pitch",
+        moodPreference: "calm, focused, quietly confident",
+      };
+    case "festive":
+      return {
+        settingPreference:
+          "festive gathering at home, warm dinner table, decorated living space, doorway greeting moment (keep it premium and grounded)",
+        wardrobePreference:
+          "festive traditional/smart outfit (non-branded). Keep it tasteful and not revealing.",
+        storyPreference:
+          "a festive moment: greeting guests, a small celebration ritual, or a warm dinner with friends/family",
+        moodPreference: "warm, joyful, premium, elegant",
+      };
+    default:
+      return null;
+  }
+}
+
 export function buildGeminiKlingPromptRequest(
   product: ProductForPrompt,
   imageCount: number,
@@ -584,6 +673,8 @@ export function buildGeminiKlingPromptRequest(
       : getProductOnlyJewellerySpec(product.product_category, imageRefStr);
 
   const wantsAmbassador = effectivePolicy.requiresAmbassador;
+  const occasion = normalizeOccasionPreset(overrides?.occasion);
+  const occasionGuidance = getOccasionCreativeGuidance(occasion);
 
   const elementTokenLine = wantsAmbassador
     ? "- <<<element_1>>> = the model persona (a person who will appear in the video)"
@@ -823,9 +914,11 @@ export function buildGeminiKlingPromptRequest(
     ? `- Each shot should include one small, natural micro-action that keeps ${jewellery.visibilityAnchor} readable WITHOUT feeling like a product display (e.g., taking notes during a meeting; neckline unobstructed while adjusting a blazer; hair staying off ears during conversation; wrist visible while typing).`
     : `- Each shot should include one small, natural micro-action that keeps ${jewellery.visibilityAnchor} readable WITHOUT feeling like a product display (e.g., checking a message while walking; adjusting hair; smoothing a sleeve; placing a hand on a bag strap; resting wrist on a cafe table).`;
 
-  const settingLine = isBusinesswomanStyle
-    ? `- Pick two real-life settings (one per shot). Prefer: modern office, boardroom, elevator, office lobby, commute, cafe between meetings, home office before a presentation, balcony at dusk after a win.`
-    : `- Pick two real-life settings (one per shot). Prefer: bright home, cafe, boutique, outdoor walkway, mirror-ready moment before an event, relaxed dinner setting, festive gathering (keep it grounded and not over-the-top).`;
+  const settingLine = occasionGuidance
+    ? `- Occasion: ${occasion}. Pick two real-life settings (one per shot). Prefer: ${occasionGuidance.settingPreference}.`
+    : isBusinesswomanStyle
+      ? `- Pick two real-life settings (one per shot). Prefer: modern office, boardroom, elevator, office lobby, commute, cafe between meetings, home office before a presentation, balcony at dusk after a win.`
+      : `- Pick two real-life settings (one per shot). Prefer: bright home, cafe, boutique, outdoor walkway, mirror-ready moment before an event, relaxed dinner setting, festive gathering (keep it grounded and not over-the-top).`;
 
   const systemPromptAmbassador = `You write Kling AI video prompts for a luxury jewellery ad featuring a human subject (model persona).
 
@@ -931,13 +1024,17 @@ ${goodExampleShot2}`;
 
   const systemPrompt = wantsAmbassador ? systemPromptAmbassador : systemPromptProductOnly;
 
-  const ambassadorStoryLine = isBusinesswomanStyle
-    ? `Story: portray <<<element_1>>> as a modern, successful woman in her day-to-day life. Include at least one high-stakes-but-real moment (e.g., prepping/leading a presentation, important meeting, commute to a big pitch). The jewellery must be incidental - never deliberately shown to the camera.`
-    : `Story: portray <<<element_1>>> in a premium, relatable lifestyle moment (brand-neutral). Choose a setting and mood that suits the jewellery; keep it natural, not posing. The jewellery must be incidental - never deliberately shown to the camera.`;
+  const ambassadorStoryLine = occasionGuidance
+    ? `Story: portray <<<element_1>>> in ${occasionGuidance.storyPreference}. The jewellery must be incidental - never deliberately shown to the camera.`
+    : isBusinesswomanStyle
+      ? `Story: portray <<<element_1>>> as a modern, successful woman in her day-to-day life. Include at least one high-stakes-but-real moment (e.g., prepping/leading a presentation, important meeting, commute to a big pitch). The jewellery must be incidental - never deliberately shown to the camera.`
+      : `Story: portray <<<element_1>>> in a premium, relatable lifestyle moment (brand-neutral). Choose a setting and mood that suits the jewellery; keep it natural, not posing. The jewellery must be incidental - never deliberately shown to the camera.`;
 
-  const ambassadorWardrobeLine = isBusinesswomanStyle
-    ? `Wardrobe: business professional (corporate/boardroom). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).`
-    : `Wardrobe: premium, non-branded outfit (casual/smart/festive/traditional). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).`;
+  const ambassadorWardrobeLine = occasionGuidance
+    ? `Wardrobe: ${occasionGuidance.wardrobePreference} Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).`
+    : isBusinesswomanStyle
+      ? `Wardrobe: business professional (corporate/boardroom). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).`
+      : `Wardrobe: premium, non-branded outfit (casual/smart/festive/traditional). Explicitly describe the outfit in Shot 1 and keep the same outfit in Shot 2. Avoid anything revealing (no corset/lingerie/crop tops).`;
 
   const userMessageAmbassador = `Write a Kling video prompt for:
 Product: ${product.product_title}
@@ -951,6 +1048,7 @@ In Shot 2 JSON, set jewellery.worn_text to exactly: "${jewellery.shot2WornText}"
 In Shot 1 JSON, include jewellery.size_cue with an approximate real-world measurement based on the reference photos (mm/cm + optional inches), kept short (e.g., "pendant ~18mm (0.7in)").
 ${ambassadorStoryLine}
 ${ambassadorWardrobeLine}
+${occasionGuidance ? `Occasion: ${occasion}. Keep settings, wardrobe, and mood consistent with this occasion.` : ""}
 
 Output a TWO-SHOT storyboard using these headings, with ONE JSON object after each heading:
 Shot 1 (0-5s): ...
@@ -969,6 +1067,7 @@ In Shot 2 JSON, set jewellery.worn_text to exactly: "${jewellery.shot2WornText}"
 In Shot 1 JSON, include jewellery.size_cue with an approximate real-world measurement based on the reference photos (mm/cm + optional inches), kept short (e.g., "pendant ~18mm (0.7in)").
 
 Creative direction: premium studio product film. Slow camera orbit, controlled lighting, shallow depth of field, realistic metal reflections. No humans, hands, faces, mannequins, worn shots, or lifestyle scenes.
+${occasionGuidance ? `Occasion: ${occasion}. Keep it studio-only, but adjust mood/lighting/backdrop to feel ${occasionGuidance.moodPreference}.` : ""}
 
 Output a TWO-SHOT storyboard using these headings, with ONE JSON object after each heading:
 Shot 1 (0-5s): ...

@@ -8,6 +8,7 @@ export type CompanyPromptProfileOverrides = {
   variables?: Record<string, unknown>;
   klingElementIds?: string[];
   scrapeAdapter?: ScraperAdapter;
+  ambassadorReferenceImageUrl?: string;
 };
 
 type SupabaseClientLike = {
@@ -89,7 +90,7 @@ export async function getCompanyPromptProfileOverrides(
   const { data, error } = await supabase
     .from("company_prompt_profiles")
     .select(
-      "prompt_style, requires_ambassador, creative_brief, variables, kling_element_ids, scrape_profile"
+      "prompt_style, requires_ambassador, creative_brief, variables, kling_element_ids, scrape_profile, ambassador_reference_image_url"
     )
     .eq("company_slug", slug)
     .maybeSingle();
@@ -127,6 +128,13 @@ export async function getCompanyPromptProfileOverrides(
 
   if (isRecord(data.scrape_profile) && isScraperAdapter(data.scrape_profile.adapter)) {
     out.scrapeAdapter = data.scrape_profile.adapter;
+  }
+
+  if (
+    typeof data.ambassador_reference_image_url === "string" &&
+    data.ambassador_reference_image_url.trim()
+  ) {
+    out.ambassadorReferenceImageUrl = data.ambassador_reference_image_url.trim();
   }
 
   return out;

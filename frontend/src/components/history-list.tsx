@@ -36,7 +36,14 @@ export function HistoryList({ runs, onSelect, selectedId }: Props) {
             <span className="text-sm font-medium text-zinc-800 truncate max-w-[70%]">
               {run.product_title || run.source_url}
             </span>
-            <StatusBadge status={run.status} />
+            <div className="flex items-center gap-2">
+              {run.occasion && run.occasion !== "auto" && (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                  {formatOccasion(run.occasion)}
+                </span>
+              )}
+              <StatusBadge status={run.status} />
+            </div>
           </div>
           {run.product_category && (
             <div className="mt-1 text-xs text-zinc-400 capitalize">
@@ -71,4 +78,22 @@ function StatusBadge({ status }: { status: VideoRun["status"] }) {
       {status}
     </span>
   );
+}
+
+function formatOccasion(occasion: NonNullable<VideoRun["occasion"]>): string {
+  switch (occasion) {
+    case "casual":
+      return "Casual";
+    case "partywear":
+      return "Partywear";
+    case "marriage":
+      return "Wedding";
+    case "workwear":
+      return "Workwear";
+    case "festive":
+      return "Festive";
+    case "auto":
+    default:
+      return "Auto";
+  }
 }
