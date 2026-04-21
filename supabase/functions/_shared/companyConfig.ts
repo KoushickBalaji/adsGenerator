@@ -63,7 +63,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["bluestone.com"],
     scraper: {
       adapter: "bluestone",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -94,7 +94,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["giva.co"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -125,7 +125,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["melorra.com"],
     scraper: {
       adapter: "generic",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -156,7 +156,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["kushals.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -187,7 +187,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["shopklarity.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -218,7 +218,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["quirksmith.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -249,7 +249,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["iyalsilvers.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -280,7 +280,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["onyadiamonds.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -311,7 +311,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["aukerajewellery.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -342,7 +342,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["caratcult.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -373,7 +373,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["shravia.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -404,7 +404,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["houseofmila.co"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -435,7 +435,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: ["ishhaara.com"],
     scraper: {
       adapter: "shopify",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -467,7 +467,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     scraper: {
       // Thangamayil's store pages are HTML-first (Magento-style); use the generic HTML scraper.
       adapter: "generic",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -505,7 +505,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: [],
     scraper: {
       adapter: "generic",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],
@@ -536,7 +536,7 @@ const COMPANY_REGISTRY: Record<string, CompanyConfig> = {
     allowedHosts: [],
     scraper: {
       adapter: "generic",
-      maxReferenceImages: 12,
+      maxReferenceImages: 30,
     },
     kling: {
       modelCandidates: ["kling-v3-omni", "kling-v3"],

@@ -34,6 +34,7 @@ Frontend
 - Company demo route: `frontend/src/app/demo/[company]`.
 - Calls Supabase Edge Functions:
   - `create-run` to start a run
+  - `generate-previews` to generate still previews (Shot 1 + Shot 2, best-effort)
   - `random-product` to fetch a random product URL (for “Try a random item”)
   - `refresh-run` as a polling fallback
 - Subscribes to Supabase Realtime updates on `public.video_runs`.
@@ -43,6 +44,8 @@ Backend
 Supabase Edge Functions:
 
 - `create-run`: orchestrates scrape → Gemini prompt → Kling job.
+- `generate-previews`: reads the stored storyboard prompt and generates 2 still preview images (Gemini image generation).
+  - Uses multiple image references when available (ambassador identity + product angles), capped by the model limit (currently 14 images per prompt for `gemini-3-pro-image-preview`).
 - `random-product`: discovers a random product URL via the company sitemap (best-effort).
 - `kling-webhook`: marks completion and uploads MP4 to Supabase Storage.
 - `refresh-run`: polling fallback (queries Kling by `provider_job_id`).
@@ -62,6 +65,11 @@ Data model
 - Each row is a generation attempt.
 - `company_slug` scopes all reads/writes.
 - `input_images` stores the first **4** reference images used for Kling and shown in the UI.
+- `scraped_images` stores the full scraped product gallery (best-effort; bounded by backend scraper `maxReferenceImages`).
+- `occasion` stores the selected preset (`auto|casual|partywear|marriage|workwear|festive`) to steer prompt + previews.
+- `preview_images` stores up to **2** still preview URLs (Shot 1 + Shot 2).
+- `preview_error` stores a non-blocking error message for preview generation.
+- `ambassador_element_id` / `ambassador_element_name` store which Kling persona was used for this run (when enabled).
 
 `public.company_prompt_profiles`
 
@@ -78,6 +86,25 @@ One row per company. Used for:
   - `prompt_style`, `requires_ambassador`, `creative_brief`, `variables`
 - Kling element overrides:
   - `kling_element_ids` (optional; if present, backend uses these IDs rather than prefix-based selection)
+- Still-preview identity (optional):
+  - `ambassador_reference_image_url` (public URL used as a Gemini reference image for preview generation)
+  - Optional: set `variables.ambassador_reference_image_urls` to pass multiple identity reference images to Gemini (helps keep the same ambassador).
+  - Example repo asset: `/kling-elements/thangamayil-muse-01/front.jpg`
+  - Current demo URL: `https://ads-generator-hazel.vercel.app/kling-elements/thangamayil-muse-01/front.jpg`
+
+`public.kling_element_assets`
+
+Mapping table for reusing the same frontal image used when creating Kling custom elements:
+
+- `element_id` → `frontal_url` (public URL)
+- Used by `generate-previews` when a run has `ambassador_element_id` and no per-company override is configured
+
+Persona assets in the repo
+
+- Persona image files used for Kling element creation live in `frontend/public/kling-elements/`.
+- When deployed, these are reachable at `https://<your-domain>/kling-elements/...` and can be used as:
+  - `assets_base_url` inputs for `test-prompt?mode=elements-create`, and
+  - `kling_element_assets.frontal_url` values for preview identity anchoring.
 
 Company config registry
 
@@ -119,7 +146,13 @@ Reference images and why only 4 go to Kling
 
 - Kling Omni-Video uses up to 4 images in `image_list`.
 - The prompt template uses `<<<image_1>>>..<<<image_4>>>` tokens.
-- When >4 images exist, Gemini can select the best 4 (when enough are fetchable). Remaining images are used as prompt-only context.
+- When >4 images exist, Gemini selects the best 4 for Kling. The full gallery is persisted to `video_runs.scraped_images` and is used (best-effort) for still preview generation (Gemini), capped by Gemini’s per-prompt image limit.
+
+Occasion presets and previews
+
+- The UI allows selecting an `occasion` preset; this is passed to `create-run` and stored on `video_runs`.
+- `generate-previews` uses the stored storyboard prompt + `occasion` to generate 2 still preview images.
+- Preview generation is best-effort and must not block video generation.
 
 Operational scripts
 

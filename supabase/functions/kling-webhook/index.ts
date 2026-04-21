@@ -6,6 +6,21 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function extractVideoUrl(taskResult: any): string | null {
+  const candidates: Array<unknown> = [
+    taskResult?.videos?.[0]?.url,
+    taskResult?.videos?.[0]?.video_url,
+    taskResult?.video_url,
+    taskResult?.videoUrl,
+    taskResult?.result?.videos?.[0]?.url,
+    taskResult?.result?.video_url,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -52,9 +67,9 @@ serve(async (req) => {
     let errorMessage: string | null = null;
 
     if (taskStatus === "succeed") {
-      status = "completed";
-      const videoUrl = taskResult?.videos?.[0]?.url;
+      const videoUrl = extractVideoUrl(taskResult);
       if (videoUrl) {
+        status = "completed";
         // Download and upload to Supabase Storage for stable hosting
         outputVideoUrl = await uploadToStorage(
           supabase,
@@ -62,6 +77,9 @@ serve(async (req) => {
           run.id,
           videoUrl
         );
+      } else {
+        status = "failed";
+        errorMessage = "Video provider returned success, but no video URL was available.";
       }
     } else if (taskStatus === "failed") {
       status = "failed";

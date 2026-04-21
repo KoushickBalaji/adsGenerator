@@ -54,6 +54,11 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
 
   const activeRunId = activeRun?.id ?? null;
   const activeRunStatus = activeRun?.status ?? null;
+  const previewPending =
+    !!generatePreviews &&
+    !!activeRunId &&
+    !activeRun?.preview_error &&
+    ((activeRun?.preview_images?.length ?? 0) < 2);
 
   const loadHistory = useCallback(async () => {
     if (!normalizedCompanySlug) return;
@@ -165,8 +170,8 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
   useEffect(() => {
     if (
       !activeRunId ||
-      activeRunStatus === "completed" ||
-      activeRunStatus === "failed"
+      (!previewPending &&
+        (activeRunStatus === "completed" || activeRunStatus === "failed"))
     ) {
       return;
     }
@@ -192,7 +197,7 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeRunId, activeRunStatus]);
+  }, [activeRunId, activeRunStatus, previewPending]);
 
   // Auto-poll every 15s when a run is processing (webhook fallback)
   useEffect(() => {
@@ -246,6 +251,17 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
     activeRunStatus,
     normalizedCompanySlug,
   ]);
+
+  async function fetchFreshRun(runId: string): Promise<VideoRun | null> {
+    const { data: run } = await supabase
+      .from("video_runs")
+      .select("*")
+      .eq("id", runId)
+      .eq("company_slug", normalizedCompanySlug)
+      .maybeSingle();
+
+    return run ? (run as VideoRun) : null;
+  }
 
   async function handleGenerate(url: string) {
     setError("");
@@ -425,6 +441,12 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
 
   function handleSelectRun(run: VideoRun) {
     setActiveRun(run);
+    void (async () => {
+      const fresh = await fetchFreshRun(run.id);
+      if (!fresh) return;
+      setRuns((prev) => prev.map((r) => (r.id === fresh.id ? fresh : r)));
+      setActiveRun(fresh);
+    })();
   }
 
   async function readEdgeFunctionError(response?: Response) {

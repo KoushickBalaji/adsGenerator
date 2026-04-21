@@ -15,7 +15,10 @@ export type VideoRun = {
   status: "queued" | "processing" | "completed" | "failed";
   provider: string;
   provider_job_id: string | null;
+  // Up to 4 reference images actually sent to Kling (and shown as "Reference Images").
   input_images: string[];
+  // Full scraped product gallery (best-effort; bounded by backend scraper maxReferenceImages).
+  scraped_images?: string[];
   prompt: string | null;
   output_video_url: string | null;
   thumbnail_url: string | null;

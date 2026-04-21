@@ -225,6 +225,9 @@ function renderShotStillPrompt(opts: {
   lines.push(
     "Jewellery is present but subtle and realistic; no deliberate showcasing; no extra jewellery."
   );
+  lines.push(
+    "The jewellery design must match the provided product reference image exactly (shape, placement, materials)."
+  );
   lines.push("No text, no logos, no brand names, no signage, no watermarks.");
   lines.push("High-end editorial color grading; natural skin tones; premium materials.");
 
@@ -259,7 +262,9 @@ async function imageUrlToInlineDataPart(
 
 async function generateGeminiImage(opts: {
   promptText: string;
-  referenceImageUrl?: string | null;
+  referenceImageUrls?: string[] | null;
+  productImageUrls?: string[] | null;
+  extraIdentityImagePart?: { inline_data: { mime_type: string; data: string } } | null;
 }): Promise<{
   bytes: Uint8Array;
   mimeType: string;
@@ -271,16 +276,73 @@ async function generateGeminiImage(opts: {
     (Deno.env.get("GEMINI_IMAGE_MODEL") ?? "").trim() ||
     "gemini-3-pro-image-preview";
 
-  const referencePart =
-    opts.referenceImageUrl ? await imageUrlToInlineDataPart(opts.referenceImageUrl) : null;
+  const referenceUrls = ensureStringArray(opts.referenceImageUrls);
+  const referenceParts: Array<{ inline_data: { mime_type: string; data: string } }> = [];
+  for (const url of referenceUrls) {
+    const part = await imageUrlToInlineDataPart(url);
+    if (part) referenceParts.push(part);
+  }
+  const productUrls = ensureStringArray(opts.productImageUrls);
+  const productParts: Array<{ inline_data: { mime_type: string; data: string } }> = [];
+  for (const url of productUrls) {
+    const part = await imageUrlToInlineDataPart(url);
+    if (part) productParts.push(part);
+  }
 
-  const parts: Array<Record<string, unknown>> = [
-    { text: opts.promptText },
-  ];
+  const maxImagesPerPrompt = 14;
 
-  if (referencePart) {
-    parts.push({ text: "Reference image (use the same person/face; keep identity consistent):" });
-    parts.push(referencePart as unknown as Record<string, unknown>);
+  // Prioritize using as many product reference images as possible, while still providing at least
+  // one identity anchor when available.
+  const primaryIdentityPart =
+    referenceParts[0] ?? (opts.extraIdentityImagePart ?? null);
+  const secondaryIdentityPart =
+    primaryIdentityPart === (opts.extraIdentityImagePart ?? null)
+      ? null
+      : (opts.extraIdentityImagePart ?? null);
+  const extraIdentityParts = referenceParts.slice(primaryIdentityPart ? 1 : 0);
+
+  let remainingSlots = maxImagesPerPrompt;
+  const selectedIdentityParts: Array<Record<string, unknown>> = [];
+  const selectedProductParts: Array<Record<string, unknown>> = [];
+
+  if (primaryIdentityPart && remainingSlots > 0) {
+    selectedIdentityParts.push(primaryIdentityPart as unknown as Record<string, unknown>);
+    remainingSlots--;
+  }
+
+  for (const part of productParts) {
+    if (remainingSlots <= 0) break;
+    selectedProductParts.push(part as unknown as Record<string, unknown>);
+    remainingSlots--;
+  }
+
+  if (secondaryIdentityPart && remainingSlots > 0) {
+    selectedIdentityParts.push(secondaryIdentityPart as unknown as Record<string, unknown>);
+    remainingSlots--;
+  }
+
+  for (const part of extraIdentityParts) {
+    if (remainingSlots <= 0) break;
+    selectedIdentityParts.push(part as unknown as Record<string, unknown>);
+    remainingSlots--;
+  }
+
+  const baseParts: Array<Record<string, unknown>> = [{ text: opts.promptText }];
+
+  if (selectedIdentityParts.length > 0) {
+    baseParts.push({
+      text:
+        "Identity reference image(s) (the person in the output MUST match the same face and overall identity):",
+    });
+    baseParts.push(...selectedIdentityParts);
+  }
+
+  if (selectedProductParts.length > 0) {
+    baseParts.push({
+      text:
+        "Product reference image(s) (the jewellery must match this exact design and be worn in the scene):",
+    });
+    baseParts.push(...selectedProductParts);
   }
 
   async function callOnce(finalParts: Array<Record<string, unknown>>) {
@@ -301,11 +363,19 @@ async function generateGeminiImage(opts: {
     );
   }
 
-  let res = await callOnce(parts);
+  let res = await callOnce(baseParts);
   let text = await res.text();
-  if (!res.ok && referencePart) {
-    // Best-effort fallback: retry without the reference image.
-    res = await callOnce([{ text: opts.promptText }]);
+  if (!res.ok && selectedIdentityParts.length > 0) {
+    // Best-effort fallback: retry without identity references (keep product if present).
+    const fallbackParts: Array<Record<string, unknown>> = [{ text: opts.promptText }];
+    if (selectedProductParts.length > 0) {
+      fallbackParts.push({
+        text:
+          "Product reference image(s) (the jewellery must match this exact design and be worn in the scene):",
+      });
+      fallbackParts.push(...selectedProductParts);
+    }
+    res = await callOnce(fallbackParts);
     text = await res.text();
   }
 
@@ -314,10 +384,10 @@ async function generateGeminiImage(opts: {
   }
 
   const data = JSON.parse(text);
-  const parts: Array<Record<string, unknown>> =
+  const responseParts: Array<Record<string, unknown>> =
     data?.candidates?.[0]?.content?.parts ?? [];
 
-  for (const part of parts) {
+  for (const part of responseParts) {
     const inlineData =
       (part.inlineData as Record<string, unknown> | undefined) ??
       (part.inline_data as Record<string, unknown> | undefined);
@@ -338,6 +408,15 @@ async function generateGeminiImage(opts: {
   }
 
   throw new Error("Gemini image response missing inlineData");
+}
+
+function bytesToInlineDataPart(bytes: Uint8Array, mimeType: string): { inline_data: { mime_type: string; data: string } } {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  const base64 = btoa(binary);
+  return { inline_data: { mime_type: mimeType, data: base64 } };
 }
 
 async function uploadImageToStorage(opts: {
@@ -394,7 +473,7 @@ serve(async (req) => {
     const { data: run, error: runError } = await supabase
       .from("video_runs")
       .select(
-        "id, company_slug, prompt, occasion, product_category, preview_images, ambassador_element_id"
+        "id, company_slug, prompt, occasion, product_category, input_images, scraped_images, preview_images, ambassador_element_id, ambassador_element_name"
       )
       .eq("id", runId)
       .eq("company_slug", config.slug)
@@ -419,35 +498,99 @@ serve(async (req) => {
     const productCategory =
       typeof productCategoryRaw === "string" ? productCategoryRaw : null;
 
+    const scrapedImagesRaw = (run as Record<string, unknown>).scraped_images;
+    const inputImagesRaw = (run as Record<string, unknown>).input_images;
+    const scrapedImages = ensureStringArray(scrapedImagesRaw);
+    const inputImages = ensureStringArray(inputImagesRaw);
+    const allProductImages = scrapedImages.length > 0 ? scrapedImages : inputImages;
+    const productImageUrls = Array.from(
+      new Set(allProductImages.map((u) => String(u).trim()).filter(Boolean))
+    );
+
     const promptProfileOverrides = await getCompanyPromptProfileOverrides(
       supabase,
       config.slug
     );
     const ambassadorReferenceImageUrl =
-      typeof (promptProfileOverrides as any)?.ambassadorReferenceImageUrl === "string"
-        ? String((promptProfileOverrides as any).ambassadorReferenceImageUrl).trim()
+      typeof promptProfileOverrides?.ambassadorReferenceImageUrl === "string"
+        ? promptProfileOverrides.ambassadorReferenceImageUrl.trim()
         : "";
 
     let elementFrontalUrl = "";
+    let elementRefUrls: string[] = [];
     const ambassadorElementIdRaw = (run as Record<string, unknown>).ambassador_element_id;
     const ambassadorElementId =
       typeof ambassadorElementIdRaw === "string" ? ambassadorElementIdRaw.trim() : "";
-    if (!ambassadorReferenceImageUrl && ambassadorElementId) {
+    const ambassadorElementNameRaw = (run as Record<string, unknown>).ambassador_element_name;
+    const ambassadorElementName =
+      typeof ambassadorElementNameRaw === "string" ? ambassadorElementNameRaw.trim() : "";
+
+    if (ambassadorElementId) {
       try {
         const { data: asset } = await supabase
           .from("kling_element_assets")
-          .select("frontal_url")
+          .select("frontal_url, ref_urls")
           .eq("element_id", ambassadorElementId)
           .maybeSingle();
         if (asset && typeof (asset as any).frontal_url === "string") {
           elementFrontalUrl = String((asset as any).frontal_url).trim();
+        }
+        if (asset && Array.isArray((asset as any).ref_urls)) {
+          elementRefUrls = ensureStringArray((asset as any).ref_urls);
         }
       } catch {
         // ignore: best-effort
       }
     }
 
-    const referenceUrl = ambassadorReferenceImageUrl || elementFrontalUrl || null;
+    if (!elementFrontalUrl && !ambassadorReferenceImageUrl && ambassadorElementName) {
+      // Secondary lookup: by name. Useful when element IDs are present but the mapping
+      // was backfilled by name, or when a run stores a name for debugging.
+      try {
+        const { data: asset } = await supabase
+          .from("kling_element_assets")
+          .select("frontal_url, ref_urls")
+          .eq("element_name", ambassadorElementName)
+          .maybeSingle();
+        if (asset && typeof (asset as any).frontal_url === "string") {
+          elementFrontalUrl = String((asset as any).frontal_url).trim();
+        }
+        if (asset && Array.isArray((asset as any).ref_urls)) {
+          elementRefUrls = ensureStringArray((asset as any).ref_urls);
+        }
+      } catch {
+        // ignore: best-effort
+      }
+    }
+
+    const variableReferenceUrls = ensureStringArray(
+      (promptProfileOverrides?.variables as Record<string, unknown> | undefined)
+        ?.ambassador_reference_image_urls ??
+        (promptProfileOverrides?.variables as Record<string, unknown> | undefined)
+          ?.ambassadorReferenceImageUrls
+    );
+
+    const identityReferenceUrls = Array.from(
+      new Set(
+        [
+          ambassadorReferenceImageUrl,
+          ...variableReferenceUrls,
+          elementFrontalUrl,
+          ...elementRefUrls,
+        ].filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      )
+    ).slice(0, 8);
+
+    if (ambassadorElementId && identityReferenceUrls.length === 0) {
+      await supabase
+        .from("video_runs")
+        .update({
+          preview_error:
+            "Ambassador reference images are not configured. Set company_prompt_profiles.ambassador_reference_image_url (and optionally variables.ambassador_reference_image_urls) or populate kling_element_assets for the selected element.",
+        })
+        .eq("id", runId)
+        .eq("company_slug", config.slug);
+    }
 
     const shot1 = extractJsonAfterHeading(
       prompt,
@@ -473,13 +616,46 @@ serve(async (req) => {
 
     let urls: string[] = [];
     try {
+      // Gemini image generation supports multiple images per prompt, but has a per-request cap.
+      // We spread product angles across Shot 1/2 when there are many images.
+      const hasIdentityRefs = identityReferenceUrls.length > 0;
+      const shot1ProductCap = hasIdentityRefs ? 13 : 14;
+      // Shot 2 always includes the Shot 1 frame as an extra identity anchor.
+      const shot2ProductCap = 13;
+
+      const normalizedProductUrls = productImageUrls.filter(Boolean);
+      const first = normalizedProductUrls[0] ?? "";
+
+      const shot1Products =
+        normalizedProductUrls.length <= shot1ProductCap
+          ? normalizedProductUrls
+          : normalizedProductUrls.slice(0, shot1ProductCap);
+
+      const remaining = normalizedProductUrls.slice(shot1ProductCap);
+      const shot2Products =
+        normalizedProductUrls.length <= shot1ProductCap
+          ? normalizedProductUrls
+          : Array.from(
+              new Set(
+                [first, ...remaining].filter(Boolean)
+              )
+            ).slice(0, shot2ProductCap);
+
       const img1 = await generateGeminiImage({
-        promptText: prompt1,
-        referenceImageUrl: referenceUrl,
+        promptText: `${prompt1} Ensure the jewellery from the product reference image is visible and consistent.`,
+        referenceImageUrls: identityReferenceUrls,
+        productImageUrls: shot1Products,
+        extraIdentityImagePart: null,
       });
+
+      // Use Shot 1 as an extra identity anchor for Shot 2 so the same ambassador carries across.
+      const shot1IdentityPart = bytesToInlineDataPart(img1.bytes, img1.mimeType);
+
       const img2 = await generateGeminiImage({
-        promptText: prompt2,
-        referenceImageUrl: referenceUrl,
+        promptText: `${prompt2} Ensure the jewellery from the product reference image is visible and consistent.`,
+        referenceImageUrls: identityReferenceUrls,
+        productImageUrls: shot2Products,
+        extraIdentityImagePart: shot1IdentityPart,
       });
 
       const url1 = await uploadImageToStorage({

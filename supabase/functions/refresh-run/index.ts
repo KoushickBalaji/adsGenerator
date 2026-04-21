@@ -9,6 +9,23 @@ const CORS_HEADERS = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function extractVideoUrl(task: any): string | null {
+  const candidates: Array<unknown> = [
+    task?.task_result?.videos?.[0]?.url,
+    task?.task_result?.videos?.[0]?.video_url,
+    task?.task_result?.video_url,
+    task?.task_result?.videoUrl,
+    task?.task_result?.result?.videos?.[0]?.url,
+    task?.task_result?.result?.video_url,
+    task?.videos?.[0]?.url,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -69,15 +86,18 @@ serve(async (req) => {
     let errorMessage: string | null = null;
 
     if (task.task_status === "succeed") {
-      status = "completed";
-      const videoUrl = task.task_result?.videos?.[0]?.url;
+      const videoUrl = extractVideoUrl(task);
       if (videoUrl) {
+        status = "completed";
         outputVideoUrl = await uploadToStorage(
           supabase,
           run.company_slug ?? config.slug,
           run.id,
           videoUrl
         );
+      } else {
+        status = "failed";
+        errorMessage = "Video provider returned success, but no video URL was available.";
       }
     } else if (task.task_status === "failed") {
       status = "failed";

@@ -423,50 +423,92 @@ function ShotPreviews({ run }: { run: VideoRun }) {
 }
 
 export function ReferencePanel({ run }: { run: VideoRun }) {
-  const allImages = run.input_images ?? [];
-  const images = allImages.slice(0, 4);
+  const scraped = Array.isArray(run.scraped_images) ? run.scraped_images : [];
+  const referenceImages = Array.isArray(run.input_images) ? run.input_images : [];
+  const productImages = (scraped.length > 0 ? scraped : referenceImages).filter(Boolean);
 
-  if (allImages.length === 0) return null;
+  if (productImages.length === 0 && referenceImages.length === 0) return null;
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-4">
-      <h3 className="text-sm font-medium text-zinc-600 mb-3">
-        Product Images{" "}
-        <span className="text-xs text-zinc-400 font-normal">
-          ({images.length}
-          {allImages.length > images.length ? ` of ${allImages.length}` : ""})
-        </span>
-      </h3>
+      {productImages.length > 0 && (
+        <>
+          <h3 className="text-sm font-medium text-zinc-600 mb-3">
+            Product Images{" "}
+            <span className="text-xs text-zinc-400 font-normal">
+              ({productImages.length})
+            </span>
+          </h3>
 
-      <div className="grid grid-cols-2 gap-2">
-        {images.map((url, idx) => {
-          const label = `Angle ${idx + 1}`;
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-2">
+              {productImages.map((url, idx) => {
+                const label = `Angle ${idx + 1}`;
 
-          return (
-            <a
-              key={`${url}-${idx}`}
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="group block"
-              title={label}
-            >
-              <div className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
-                <img
-                  src={url}
-                  alt={label}
-                  referrerPolicy="no-referrer"
-                  className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                  loading="lazy"
-                />
-              </div>
-              <p className="mt-1 text-xs text-zinc-400 group-hover:text-zinc-600 transition-colors text-center">
-                {label}
-              </p>
-            </a>
-          );
-        })}
-      </div>
+                return (
+                  <a
+                    key={`${url}-${idx}`}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group block"
+                    title={label}
+                  >
+                    <div className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
+                      <img
+                        src={url}
+                        alt={label}
+                        referrerPolicy="no-referrer"
+                        className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                        loading="lazy"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-400 group-hover:text-zinc-600 transition-colors text-center">
+                      {label}
+                    </p>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {referenceImages.length > 0 && (
+        <div className={productImages.length > 0 ? "mt-4" : ""}>
+          <h4 className="text-xs font-semibold text-zinc-500 tracking-wide">
+            Reference Images <span className="font-normal text-zinc-400">(sent to Kling)</span>
+          </h4>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {referenceImages.slice(0, 4).map((url, idx) => {
+              const label = `Ref ${idx + 1}`;
+              return (
+                <a
+                  key={`${url}-${idx}`}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group block"
+                  title={label}
+                >
+                  <div className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
+                    <img
+                      src={url}
+                      alt={label}
+                      referrerPolicy="no-referrer"
+                      className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                      loading="lazy"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-400 group-hover:text-zinc-600 transition-colors text-center">
+                    {label}
+                  </p>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {run.source_url && (
         <a

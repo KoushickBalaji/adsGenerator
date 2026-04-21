@@ -334,6 +334,8 @@ serve(async (req) => {
       .update({
         product_title: product.product_title,
         product_category: product.product_category,
+        // Persist the full scraped gallery (best-effort; bounded by scraper maxReferenceImages).
+        scraped_images: product.input_images,
         // Persist the references used for this run (keep the UI simple).
         // Kling receives the first 4 reference images.
         input_images: (request.productImageUrls || []).slice(0, 4),

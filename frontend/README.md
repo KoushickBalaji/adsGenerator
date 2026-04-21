@@ -33,6 +33,17 @@ Open `http://localhost:3000`.
 - `/`: landing page (paste a product URL; routes to the correct demo)
 - `/demo/<companySlug>`: company demo page
 
+## Demo Controls
+
+On `/demo/<companySlug>`:
+
+- `Occasion` preset: `Auto | Casual | Partywear | Marriage/Wedding | Workwear | Festive`
+- `Generate shot previews`: when enabled, the UI triggers the backend `generate-previews` function after starting a run.
+
+## Side Panels
+
+- Right panel shows `Product Images` (the scraped gallery, when available) and `Reference Images` (the up to 4 images actually sent to Kling).
+
 ## How Company Routing Works
 
 - The landing page detects which company a URL belongs to by hostname mapping in `frontend/src/lib/company.ts`.
