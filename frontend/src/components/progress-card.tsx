@@ -418,7 +418,7 @@ function ShotPreviews({ run, variant = "inline" }: { run: VideoRun; variant?: "i
               <img
                 src={shot1}
                 alt="Shot 1 preview"
-                className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                className="block w-full h-auto transition-transform duration-200 group-hover:scale-[1.02]"
                 loading="lazy"
               />
             </div>
@@ -444,7 +444,7 @@ function ShotPreviews({ run, variant = "inline" }: { run: VideoRun; variant?: "i
               <img
                 src={shot2}
                 alt="Shot 2 preview"
-                className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                className="block w-full h-auto transition-transform duration-200 group-hover:scale-[1.02]"
                 loading="lazy"
               />
             </div>

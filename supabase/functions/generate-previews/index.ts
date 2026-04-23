@@ -17,6 +17,8 @@ type OccasionPreset =
   | "workwear"
   | "festive";
 
+type PreviewAspectRatio = "1:1" | "16:9" | "9:16";
+
 function normalizeCompanySlug(input: unknown): string {
   return typeof input === "string" ? input.trim().toLowerCase() : "";
 }
@@ -34,6 +36,12 @@ function isOccasionPreset(value: unknown): value is OccasionPreset {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function normalizePreviewAspectRatio(value: unknown): PreviewAspectRatio {
+  const v = typeof value === "string" ? value.trim() : "";
+  if (v === "16:9" || v === "9:16" || v === "1:1") return v;
+  return "1:1";
 }
 
 function ensureStringArray(value: unknown): string[] {
@@ -132,6 +140,7 @@ function renderShotStillPrompt(opts: {
   shot: Record<string, unknown> | null;
   productCategory: string | null;
   occasion: OccasionPreset;
+  aspectRatio: PreviewAspectRatio;
   shotLabel: "Shot 1" | "Shot 2";
 }): string {
   const category = (opts.productCategory || "jewellery").trim().toLowerCase();
@@ -208,8 +217,14 @@ function renderShotStillPrompt(opts: {
               : "casual premium vibe";
 
   const lines: string[] = [];
+  const aspectHint =
+    opts.aspectRatio === "16:9"
+      ? "Landscape 16:9"
+      : opts.aspectRatio === "9:16"
+        ? "Portrait 9:16"
+        : "Square 1:1";
   lines.push(
-    `Square 1:1 photorealistic cinematic still frame for a luxury jewellery lifestyle ad (${category}).`
+    `${aspectHint} photorealistic cinematic still frame for a luxury jewellery lifestyle ad (${category}).`
   );
   if (occasionHint) lines.push(`Occasion: ${occasionHint}.`);
 
@@ -461,6 +476,7 @@ serve(async (req) => {
 
     const runId = body.runId;
     const companySlug = normalizeCompanySlug(body.companySlug);
+    const aspectRatio = normalizePreviewAspectRatio(body.aspectRatio ?? body.aspect_ratio);
     if (!isNonEmptyString(runId)) return jsonResponse({ error: "Missing runId" }, 400);
 
     const config = getCompanyConfig(companySlug);
@@ -605,12 +621,14 @@ serve(async (req) => {
       shot: shot1?.json ?? null,
       productCategory,
       occasion,
+      aspectRatio,
       shotLabel: "Shot 1",
     });
     const prompt2 = renderShotStillPrompt({
       shot: shot2?.json ?? null,
       productCategory,
       occasion,
+      aspectRatio,
       shotLabel: "Shot 2",
     });
 

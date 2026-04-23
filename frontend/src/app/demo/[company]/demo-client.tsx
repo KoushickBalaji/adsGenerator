@@ -23,6 +23,14 @@ const OCCASION_OPTIONS: Array<{ value: OccasionPreset; label: string }> = [
   { value: "festive", label: "Festive" },
 ];
 
+type PreviewAspectRatio = "1:1" | "16:9" | "9:16";
+
+const PREVIEW_ASPECT_RATIO_OPTIONS: Array<{ value: PreviewAspectRatio; label: string }> = [
+  { value: "1:1", label: "1:1 (Square)" },
+  { value: "16:9", label: "16:9 (Landscape)" },
+  { value: "9:16", label: "9:16 (Portrait)" },
+];
+
 function normalizeCompanySlug(input: string): string {
   return (input || "").trim().toLowerCase();
 }
@@ -51,6 +59,7 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
   const prefetchedVideosRef = useRef<Record<string, string>>({});
   const [occasion, setOccasion] = useState<OccasionPreset>("auto");
   const [generatePreviews, setGeneratePreviews] = useState(true);
+  const [previewAspectRatio, setPreviewAspectRatio] = useState<PreviewAspectRatio>("1:1");
 
   const activeRunId = activeRun?.id ?? null;
   const activeRunStatus = activeRun?.status ?? null;
@@ -322,7 +331,11 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
       if (generatePreviews) {
         supabase.functions
           .invoke("generate-previews", {
-            body: { runId: effectiveRunId, companySlug: normalizedCompanySlug },
+            body: {
+              runId: effectiveRunId,
+              companySlug: normalizedCompanySlug,
+              aspectRatio: previewAspectRatio,
+            },
           })
           .catch(() => {
             // Non-blocking: previews are best-effort.
@@ -569,6 +582,24 @@ export default function DemoClient({ companySlug, initialUrl, autostart }: Props
                 className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
               />
               <span className="font-medium text-zinc-700">Generate shot previews</span>
+            </label>
+
+            <label className="flex items-center gap-2 text-sm text-zinc-600">
+              <span className={`font-medium ${generatePreviews ? "text-zinc-700" : "text-zinc-400"}`}>
+                Preview aspect ratio
+              </span>
+              <select
+                value={previewAspectRatio}
+                onChange={(e) => setPreviewAspectRatio(e.target.value as PreviewAspectRatio)}
+                disabled={starting || !generatePreviews}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {PREVIEW_ASPECT_RATIO_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
