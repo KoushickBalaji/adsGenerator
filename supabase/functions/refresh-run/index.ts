@@ -73,7 +73,8 @@ serve(async (req) => {
       return jsonResponse({ error: "No provider job ID" }, 400);
     }
 
-    if (run.status === "completed" || run.status === "failed") {
+    const terminalCompleted = run.status === "completed" && !!run.output_video_url;
+    if (terminalCompleted || run.status === "failed") {
       return jsonResponse({ status: run.status });
     }
 
@@ -81,6 +82,7 @@ serve(async (req) => {
     const klingRes = await getTaskStatus(run.provider_job_id);
     const task = klingRes.data;
 
+    const wasCompleted = run.status === "completed";
     let status = run.status;
     let outputVideoUrl: string | null = null;
     let errorMessage: string | null = null;
@@ -96,14 +98,25 @@ serve(async (req) => {
           videoUrl
         );
       } else {
-        status = "failed";
-        errorMessage = "Video provider returned success, but no video URL was available.";
+        // If the run was already marked completed, don't flip it to failed; just surface the issue.
+        if (!wasCompleted) {
+          status = "failed";
+          errorMessage = "Video provider returned success, but no video URL was available.";
+        } else {
+          status = "completed";
+          errorMessage = "Video marked completed, but no video URL was available yet.";
+        }
       }
     } else if (task.task_status === "failed") {
-      status = "failed";
-      errorMessage = task.task_status_msg || "Generation failed";
+      if (!wasCompleted) {
+        status = "failed";
+        errorMessage = task.task_status_msg || "Generation failed";
+      } else {
+        status = "completed";
+        errorMessage = task.task_status_msg || "Provider reported failure while backfilling the video URL.";
+      }
     } else if (task.task_status === "processing") {
-      status = "processing";
+      status = wasCompleted ? "completed" : "processing";
     }
 
     // Update DB

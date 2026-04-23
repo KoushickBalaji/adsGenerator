@@ -856,14 +856,24 @@ async function scrapeFromHtml(
 }
 
 function inferCategory(title: string, category: string): string {
-  if (category) return category.toLowerCase();
-  const lower = title.toLowerCase();
-  const categories = [
-    "ring", "necklace", "pendant", "earring", "bracelet",
-    "bangle", "chain", "mangalsutra",
+  const haystack = `${category || ""} ${title || ""}`.toLowerCase();
+
+  // Important: use word boundaries so substrings like "earrings" don't get misclassified as "ring".
+  // Also handle simple plurals/splits (e.g. "mangal sutra").
+  const patterns: Array<{ category: string; re: RegExp }> = [
+    { category: "earring", re: /\bear[\s-]*rings?\b/ },
+    { category: "ring", re: /\brings?\b/ },
+    { category: "necklace", re: /\bnecklaces?\b/ },
+    { category: "pendant", re: /\bpendants?\b/ },
+    { category: "bracelet", re: /\bbracelets?\b/ },
+    { category: "bangle", re: /\bbangles?\b/ },
+    { category: "chain", re: /\bchains?\b/ },
+    { category: "mangalsutra", re: /\bmangalsutras?\b|\bmangal\s*sutra(?:s)?\b/ },
   ];
-  for (const cat of categories) {
-    if (lower.includes(cat)) return cat;
+
+  for (const { category: canonical, re } of patterns) {
+    if (re.test(haystack)) return canonical;
   }
+
   return "jewellery";
 }

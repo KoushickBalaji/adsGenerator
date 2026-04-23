@@ -242,8 +242,12 @@ export function ProgressCard({ run, onRefresh, prefetchedVideoSrc }: Props) {
       ? run.output_video_url
       : prefetchedVideoSrc || run.output_video_url;
 
+  const hasShotPreviews =
+    (Array.isArray(run.preview_images) && run.preview_images.some((u) => Boolean(String(u || "").trim()))) ||
+    Boolean(run.preview_error && String(run.preview_error).trim());
+
   return (
-    <div className="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-6">
+    <div className="flex h-full min-h-0 flex-col rounded-xl border border-zinc-200 bg-white p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-medium text-zinc-900">
@@ -277,7 +281,18 @@ export function ProgressCard({ run, onRefresh, prefetchedVideoSrc }: Props) {
               ? "Completed"
               : "Failed"}
           </span>
-          {run.status === "processing" && (
+          {run.status === "completed" && run.output_video_url && (
+            <a
+              href={run.output_video_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-zinc-500 hover:text-zinc-700 transition-colors underline underline-offset-2"
+              title="Open video in a new tab"
+            >
+              Open video
+            </a>
+          )}
+          {(run.status === "processing" || (run.status === "completed" && !run.output_video_url)) && (
             <button
               onClick={onRefresh}
               className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors border border-zinc-200 rounded px-2 py-1 hover:bg-zinc-50"
@@ -288,63 +303,80 @@ export function ProgressCard({ run, onRefresh, prefetchedVideoSrc }: Props) {
         </div>
       </div>
 
-      <ShotPreviews run={run} />
+      <div className={`min-h-0 flex-1 grid gap-4${hasShotPreviews ? " lg:grid-cols-[1fr_280px]" : ""}`}>
+        <div className="min-h-0 flex flex-col">
+          {/* Queued state */}
+          {run.status === "queued" && (
+            <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-yellow-50 border border-yellow-200">
+              <div className="w-4 h-4 border-2 border-yellow-200 border-t-yellow-600 rounded-full animate-spin" />
+              <span className="text-sm text-yellow-700">Waiting in queue...</span>
+            </div>
+          )}
 
-      {/* Queued state */}
-      {run.status === "queued" && (
-        <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-yellow-50 border border-yellow-200">
-          <div className="w-4 h-4 border-2 border-yellow-200 border-t-yellow-600 rounded-full animate-spin" />
-          <span className="text-sm text-yellow-700">Waiting in queue...</span>
-        </div>
-      )}
+          {/* Processing state - animated pipeline */}
+          {run.status === "processing" && (
+            <ProcessingPipeline startedAt={run.created_at} />
+          )}
 
-      {/* Processing state - animated pipeline */}
-      {run.status === "processing" && (
-        <ProcessingPipeline startedAt={run.created_at} />
-      )}
+          {/* Completed state */}
+          {run.status === "completed" && effectiveVideoSrc && (
+            <div className="min-h-0 flex-1 relative">
+              <video
+                src={effectiveVideoSrc}
+                preload="auto"
+                controls
+                controlsList="nodownload noremoteplayback"
+                disablePictureInPicture
+                className="h-full w-full rounded-lg bg-black/[0.02] object-contain"
+                poster={run.thumbnail_url || undefined}
+                onPlay={() => setPlaybackStartedForRunId(run.id)}
+              />
+              <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-black/10 bg-white/80 px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-600 backdrop-blur-sm">
+                Not for commercial use
+              </div>
+            </div>
+          )}
 
-      {/* Completed state */}
-      {run.status === "completed" && effectiveVideoSrc && (
-        <div className="min-h-0 flex-1 relative">
-          <video
-            src={effectiveVideoSrc}
-            preload="auto"
-            controls
-            controlsList="nodownload noremoteplayback"
-            disablePictureInPicture
-            className="h-full w-full rounded-lg object-contain"
-            poster={run.thumbnail_url || undefined}
-            onPlay={() => setPlaybackStartedForRunId(run.id)}
-          />
-          <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-black/10 bg-white/80 px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-600 backdrop-blur-sm">
-            Not for commercial use
-          </div>
-        </div>
-      )}
-
-      {/* Failed state */}
-      {run.status === "failed" && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-4 space-y-3">
-          <div className="flex items-start gap-3">
-            <svg className="mt-0.5 w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-            <div>
-              <p className="text-sm font-medium text-red-700">Video generation didn&apos;t complete</p>
-              <p className="mt-1 text-xs text-red-600/70">
-                {run.error_message || "An unexpected issue occurred during generation. This can happen occasionally with AI-powered video creation."}
+          {run.status === "completed" && !effectiveVideoSrc && (
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-sm font-medium text-zinc-700">Video completed, but no video URL is available yet</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Click Refresh to sync the run again. If it still doesn&apos;t appear, the provider may still be finalizing the file.
               </p>
             </div>
-          </div>
-          <p className="text-xs text-zinc-500">Try generating again - each attempt produces a unique result.</p>
+          )}
+
+          {/* Failed state */}
+          {run.status === "failed" && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <svg className="mt-0.5 w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-red-700">Video generation didn&apos;t complete</p>
+                  <p className="mt-1 text-xs text-red-600/70">
+                    {run.error_message || "An unexpected issue occurred during generation. This can happen occasionally with AI-powered video creation."}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-zinc-500">Try generating again - each attempt produces a unique result.</p>
+            </div>
+          )}
         </div>
-      )}
+
+        {hasShotPreviews && (
+          <div className="min-h-0 overflow-y-auto">
+            <ShotPreviews run={run} variant="panel" />
+          </div>
+        )}
+      </div>
 
     </div>
   );
 }
 
-function ShotPreviews({ run }: { run: VideoRun }) {
+function ShotPreviews({ run, variant = "inline" }: { run: VideoRun; variant?: "inline" | "panel" }) {
   const images = Array.isArray(run.preview_images) ? run.preview_images : [];
   const shot1 = images[0] ? String(images[0]) : "";
   const shot2 = images[1] ? String(images[1]) : "";
@@ -352,8 +384,16 @@ function ShotPreviews({ run }: { run: VideoRun }) {
 
   if (!shot1 && !shot2 && !previewError) return null;
 
+  const isPanel = variant === "panel";
+
   return (
-    <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+    <div
+      className={
+        isPanel
+          ? "rounded-xl border border-zinc-200 bg-zinc-50 p-4"
+          : "mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3"
+      }
+    >
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold text-zinc-600 tracking-wide">
           Shot Previews
@@ -365,7 +405,7 @@ function ShotPreviews({ run }: { run: VideoRun }) {
 
       {previewError && <p className="mt-2 text-xs text-zinc-500">{previewError}</p>}
 
-      <div className="mt-2 grid grid-cols-2 gap-2">
+      <div className={isPanel ? "mt-3 grid grid-cols-2 gap-2" : "mt-2 grid grid-cols-2 gap-2"}>
         {shot1 ? (
           <a
             href={shot1}
