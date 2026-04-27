@@ -254,6 +254,7 @@ Admin utility endpoints (via `supabase/functions/test-prompt`):
 - Create elements in bulk:
   - `POST /functions/v1/test-prompt?mode=elements-create&prefix=<prefix>` (or set `"prefix"` in the JSON body)
   - Header: `x-admin-secret: <WEBHOOK_SECRET>`
+  - Deployment note: keep Supabase JWT verification disabled for `test-prompt`; it is protected by `x-admin-secret`, and gateway JWT verification will reject direct admin calls before this function runs.
   - Names are validated to start with the chosen prefix (set `"enforce_prefix": false` to disable).
   - Also records `public.kling_element_assets` so still previews can reuse the same frontal reference image.
 - Delete elements in bulk:
